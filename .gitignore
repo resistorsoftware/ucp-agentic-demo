@@ -9,3 +9,6 @@ transcript.json
 .env.*
 *.token
 secrets/
+
+# Saved catalog credentials
+.env.local

@@ -149,7 +149,7 @@ export async function callTool(
   endpoint,
   toolName,
   args,
-  { agentProfile, fetchImpl = fetch, onExchange, signal, corsSimple = IS_BROWSER } = {},
+  { agentProfile, fetchImpl = fetch, onExchange, signal, corsSimple = IS_BROWSER, accessToken } = {},
 ) {
   if (!endpoint) throw new UcpError('No MCP endpoint', { code: 'NO_ENDPOINT' });
   if (!agentProfile) throw new UcpError('No agent profile URL', { code: 'PROFILE_NOT_FOUND' });
@@ -169,7 +169,13 @@ export async function callTool(
   const started = Date.now();
   const res = await fetchImpl(endpoint, {
     method: 'POST',
-    headers: corsSimpleHeaders(corsSimple),
+    headers: {
+      ...corsSimpleHeaders(corsSimple && !accessToken),
+      /* A saved catalog is credentialed, and an Authorization header always
+         triggers a CORS preflight — which is one more reason a saved catalog
+         belongs in a server or a CLI, never in a public static page. */
+      ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify(request),
     signal,
   });
@@ -239,10 +245,13 @@ function unwrapToolResult(result) {
  *   filters — hard exclusions; non-matching results are dropped
  */
 export async function searchCatalog(
-  { endpoint, query, context, filters, limit = 10, cursor },
+  { endpoint, query, context, filters, limit = 10, cursor, catalogId },
   options = {},
 ) {
   const catalog = { query };
+  /* A saved catalog's own filters always take precedence over anything sent
+     here, so treat catalogId as the authority, not a hint. */
+  if (catalogId) catalog.catalog_id = catalogId;
   if (context) catalog.context = context;
   if (filters) catalog.filters = filters;
   catalog.pagination = cursor ? { limit, cursor } : { limit };
@@ -296,6 +305,43 @@ function normalizeCart(payload) {
     continueUrl: c.continue_url || null,
     raw: c,
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * Credentialed access (saved catalogs)
+ * ------------------------------------------------------------------ */
+
+export const TOKEN_ENDPOINT = 'https://api.shopify.com/auth/access_token';
+
+/**
+ * Exchange Dev Dashboard client credentials for an agent access token.
+ *
+ * Tokens live 60 minutes, so fetch one at runtime rather than storing it.
+ * The client secret must never reach a browser: this is for Node only.
+ */
+export async function getAccessToken({ clientId, clientSecret, fetchImpl = fetch } = {}) {
+  if (IS_BROWSER) {
+    throw new UcpError('Refusing to exchange client credentials in a browser — the secret would be public.', {
+      code: 'UNSAFE_CONTEXT',
+    });
+  }
+  if (!clientId || !clientSecret) {
+    throw new UcpError('Missing client credentials', { code: 'NO_CREDENTIALS' });
+  }
+  const res = await fetchImpl(TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials' }),
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new UcpError(`Token exchange failed: HTTP ${res.status}`, { code: 'AUTH_FAILED', data: text.slice(0, 300) });
+  }
+  const body = JSON.parse(text);
+  if (!body.access_token) {
+    throw new UcpError('Token exchange returned no access_token', { code: 'AUTH_FAILED', data: body });
+  }
+  return { accessToken: body.access_token, tokenType: body.token_type || 'Bearer' };
 }
 
 /* ------------------------------------------------------------------ *

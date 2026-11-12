@@ -22,6 +22,8 @@ response shown verbatim. No server, no API key, no SDK.
 | [`scripts/demo-cycle.mjs`](scripts/demo-cycle.mjs) | The same cycle in a terminal, for demos and CI. |
 | [`scripts/audit-catalog.mjs`](scripts/audit-catalog.mjs) | Grades a merchant's catalog on agentic readiness, reading only what an agent reads. |
 | [`scripts/fix-catalog.mjs`](scripts/fix-catalog.mjs) | Applies catalog fixes through the Shopify Admin API (needs a token). |
+| [`scripts/saved-catalog.mjs`](scripts/saved-catalog.mjs) | Searches a Dev Dashboard saved catalog scoped to one store. Credentialed, so CLI-only. |
+| [`docs/saved-catalog.md`](docs/saved-catalog.md) | Why that path is credentialed, and how to set it up. |
 | [`docs/store-readiness.md`](docs/store-readiness.md) | The merchant side: what is live, what is not, and what to change in Shopify admin. |
 | [`docs/catalog-audit.md`](docs/catalog-audit.md) | Current audit output for `hotwire-resistor`. |
 
@@ -136,6 +138,15 @@ describing them:
   merchant are untrusted input; `safeSellerDomain()` validates a domain before it is
   used to address another merchant.
 
+## Keyless, and where that ends
+
+The global and storefront catalogs authenticate with the agent profile alone — no API
+key — which is the whole reason this demo can be a static page. A **saved catalog** is
+different: it needs a Dev Dashboard client id and secret exchanged for a bearer token.
+A client secret in a static site is a public secret, so that path lives in
+[`scripts/saved-catalog.mjs`](scripts/saved-catalog.mjs) and never in the published
+page. `getAccessToken()` refuses to run in a browser at all.
+
 ## Why it stops at the cart
 
 `hotwire-resistor.myshopify.com` publishes an empty `payment_handlers` object, so it
@@ -157,6 +168,7 @@ demo to stop: everything up to the cart is verifiable without moving money.
 | Agent profile published by this repo | ✅ accepted by the merchant |
 | Catalog agentic-readiness | 86%, up from 67% |
 | Global (cross-merchant) catalog search | ✅ works; **does not return this store** |
+| Saved catalog scoped to this store | ⏳ set up in the Dev Dashboard — [`docs/saved-catalog.md`](docs/saved-catalog.md) |
 | Agent-completed checkout | ⛔ no payment handler advertised |
 
 The two gaps are merchant-side, not protocol-side. Both are explained, with what to
