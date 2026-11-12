@@ -5,7 +5,7 @@ A working, public demonstration of the complete agentic shopping cycle over the
 (UCP 2026-08-25), run against the Shopify store
 [`hotwire-resistor.myshopify.com`](https://hotwire-resistor.myshopify.com).
 
-**Live demo: https://resistorsoftware.github.io/ucp-agentic-demo/**
+**Live demo: https://www.resistorsoftware.com/ucp-agentic-demo/**
 
 Discovery → search → selection → cart → handoff, with every JSON-RPC request and
 response shown verbatim. No server, no API key, no SDK.
@@ -17,7 +17,7 @@ response shown verbatim. No server, no API key, no SDK.
 | Piece | What it is |
 | --- | --- |
 | [`index.html`](index.html) + [`assets/`](assets) | A UCP agent that runs entirely in the browser. Static files on GitHub Pages. |
-| [`ucp/agent-profile.json`](ucp/agent-profile.json) | **This agent's own published UCP profile.** Merchants fetch it during negotiation. |
+| [`ucp/agent-profile.json`](ucp/agent-profile.json) | **This agent's own published UCP profile.** Merchants fetch it during negotiation — served via jsDelivr, for the reason below. |
 | [`src/ucp-client.js`](src/ucp-client.js) | A dependency-free UCP client, shared unchanged by the browser app and the Node scripts. |
 | [`scripts/demo-cycle.mjs`](scripts/demo-cycle.mjs) | The same cycle in a terminal, for demos and CI. |
 | [`scripts/audit-catalog.mjs`](scripts/audit-catalog.mjs) | Grades a merchant's catalog on agentic readiness, reading only what an agent reads. |
@@ -65,10 +65,15 @@ node scripts/audit-catalog.mjs --markdown docs/catalog-audit.md
 
 # the browser demo
 python3 -m http.server 4173     # then open http://localhost:4173
+
+# grade, then fix, a catalog you own (dry run by default)
+node scripts/fix-catalog.mjs --token-file ~/.config/ucp-demo/shopify-token
+node scripts/fix-catalog.mjs --token-file ~/.config/ucp-demo/shopify-token --apply
 ```
 
 Environment overrides: `UCP_STORE_DOMAIN`, `UCP_AGENT_PROFILE`,
-`UCP_USE_PUBLISHED_PROFILE=1`.
+`UCP_USE_SHOPIFY_PROFILE=1` (negotiate as one of Shopify's reference agents instead,
+useful for isolating whether a failure is yours or theirs).
 
 ### With Shopify's own CLI
 
@@ -83,13 +88,24 @@ npx @shopify/ucp-cli catalog search --business https://hotwire-resistor.myshopif
 
 ## Two things worth knowing, both learned the hard way
 
-**This page publishes its own agent identity.** Every UCP request carries
-`meta.ucp-agent.profile`, a URL the merchant's server *fetches* during negotiation.
-Point it at something unreachable and the merchant answers
-`profile_unreachable` — verified against the live store. That is why
-`ucp/agent-profile.json` is served from GitHub Pages: the demo presents a real,
-publicly resolvable identity of its own. Served from `localhost`, the page falls
-back to a profile Shopify publishes and says so in the header.
+**Publishing an agent identity is harder than it looks.** Every UCP request carries
+`meta.ucp-agent.profile`, a URL the merchant's server *fetches* during negotiation,
+and Shopify validates two separate things about it:
+
+- **Reachability.** A `localhost` or otherwise unresolvable URL is rejected with
+  `profile_unreachable`.
+- **Cache headers.** GitHub Pages serves JSON with `Cache-Control: max-age=600`, and
+  Shopify rejects that outright: `profile_malformed: Invalid cache control`. Pages
+  offers no way to change it.
+
+So the demo page is on GitHub Pages, but the profile it presents is served from this
+same repository through **jsDelivr**, which sends
+`public, max-age=604800` as `application/json` — accepted on the first try.
+Both failures and the fix were verified against the live store; see
+`PUBLISHED_AGENT_PROFILE` in [`src/config.js`](src/config.js).
+
+Because that URL resolves from anywhere, the demo presents its own identity even when
+you open it on `localhost`. Append `?profile=<url>` to negotiate as a different agent.
 
 **A static page can speak UCP without a proxy.** Both Shopify UCP endpoints answer
 with `Access-Control-Allow-Origin: *`, but `catalog.shopify.com` answers a CORS
@@ -134,10 +150,12 @@ demo to stop: everything up to the cart is verifiable without moving money.
 | --- | --- |
 | Merchant publishes a UCP profile | ✅ `2026-08-25`, 13 capabilities |
 | Version negotiation | ✅ |
-| Storefront catalog search | ✅ 9 products exposed to agents |
+| Storefront catalog search | ✅ 6 products exposed to agents |
 | `get_product` | ✅ |
 | `create_cart` with real totals | ✅ |
 | Buyer handoff `continue_url` | ✅ |
+| Agent profile published by this repo | ✅ accepted by the merchant |
+| Catalog agentic-readiness | 86%, up from 67% |
 | Global (cross-merchant) catalog search | ✅ works; **does not return this store** |
 | Agent-completed checkout | ⛔ no payment handler advertised |
 

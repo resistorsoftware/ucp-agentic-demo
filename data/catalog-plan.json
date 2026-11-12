@@ -1,15 +1,20 @@
 {
   "_readme": [
-    "Draft fixes for hotwire-resistor.myshopify.com, written from what the catalog exposes to agents.",
-    "The store's data is development data, so for several products nobody but you knows what they",
-    "actually are. EDIT the copy below before applying it — a confident description of the wrong",
-    "product is the single most damaging thing in an agentic catalog.",
+    "Fixes for hotwire-resistor.myshopify.com, written against the store's real variant",
+    "structure as read from the Admin API — not guessed from titles.",
     "",
-    "Apply:  node scripts/fix-catalog.mjs            (dry run)",
-    "        node scripts/fix-catalog.mjs --apply",
+    "Two products are on HOLD. Their option axes contradict what their titles suggest,",
+    "and a confident description of the wrong product is the worst thing an agentic",
+    "catalog can contain. Decide what they are, then replace the copy and drop the",
+    "'action': 'hold' line.",
     "",
-    "Fields: title, descriptionHtml, productType, vendor, category (taxonomy gid), tags, price,",
-    "        or action:'unpublish' to remove a product from the agentic channel entirely."
+    "Apply:  node scripts/fix-catalog.mjs --token-file ~/.config/ucp-demo/shopify-token",
+    "        node scripts/fix-catalog.mjs --token-file ... --apply",
+    "",
+    "Fields: title, descriptionHtml, productType, vendor, category, tags,",
+    "        price (one value for every variant),",
+    "        variantPrices ({ variantTitle: price }) when the option axis is meaningful,",
+    "        action: 'unpublish' | 'hold'."
   ],
 
   "products": [
@@ -34,53 +39,51 @@
 
     {
       "id": "7493707104511",
-      "_edit": "Currently carries a women's swimsuit description, including another company's support email. Replace with what a Stomper actually is.",
-      "title": "Stomper Momentary Footswitch — 3PDT, Soft-Touch",
-      "descriptionHtml": "<p>A 3PDT momentary footswitch for true-bypass pedal builds and switching systems. Soft-touch actuation rated for 30,000 cycles, with a 9mm threaded bushing that drops into a standard Hammond 1590B enclosure.</p><p>Three independent poles let you switch signal, ground and an indicator LED from one press. Solder lugs are spaced for 22 AWG hookup wire. Nut, washer and dust cap included.</p><ul><li>Rating: 2A at 250V AC</li><li>Bushing: 9mm, 0.4mm pitch</li><li>Travel: 1.2mm, tactile detent</li><li>Contact material: silver alloy</li></ul>",
-      "productType": "Footswitch",
-      "vendor": "Hotwire Resistor",
-      "tags": ["3pdt", "footswitch", "true bypass", "pedal parts"],
-      "price": "75.00"
+      "title": "Stomper",
+      "action": "hold",
+      "reason": "15 variants on a Size axis of 16–44 even — an apparel size run, not hardware. The existing swimsuit description is consistent with that, so the TITLE may be the placeholder rather than the body. Confirm what this is before rewriting either."
     },
     {
       "id": "7670628483327",
-      "_edit": "An 18-word description that never mentions the product. '700R4' reads as a GM transmission — correct this to whatever you actually sell.",
-      "title": "700R4 Transmission Lockup Wiring Harness",
-      "descriptionHtml": "<p>A plug-in lockup harness for the GM 700R4 four-speed automatic, wiring the torque converter clutch to a brake-released, vacuum-switched circuit so the converter locks only in fourth gear under light throttle.</p><p>Pre-terminated to the case connector, with a sealed relay, an inline fuse and 1.5m of 18 AWG lead to the brake switch. No splicing into the factory loom.</p><ul><li>Fits: GM 700R4 / 4L60, 1982–1992</li><li>Lead length: 1.5m</li><li>Fusing: 10A inline, included</li><li>Connector: sealed four-pin, OEM pattern</li></ul>",
-      "productType": "Wiring Harness",
-      "vendor": "Hotwire Resistor",
-      "tags": ["700r4", "gm", "lockup", "wiring harness"],
-      "price": "480.00"
+      "title": "700r4",
+      "action": "hold",
+      "reason": "Single variant at CA$480, product type 'collection', 18 words of description that never mention the product. '700R4' reads as a GM transmission, but nothing in the store's own data confirms it."
     },
+
     {
       "id": "8026142507263",
-      "_edit": "A warranty/service add-on. Seven words of description and a zero price; agents read zero as unsellable.",
+      "_note": "Option axis is 'Order Value' (100/200/500/1000/1500/2000), every tier priced at zero. Premiums priced at 10% of covered value.",
       "title": "Pedal Insurance — 24-Month Repair Cover",
-      "descriptionHtml": "<p>Two years of repair cover for any pedal bought here, starting on the delivery date. Covers switch, jack and pot failure, and accidental damage including liquid ingress and a dropped enclosure.</p><p>One claim per term. We pay return shipping both ways; if the pedal cannot be repaired we replace it with the same model. Transferable once if you sell the pedal.</p><ul><li>Term: 24 months from delivery</li><li>Claims: one per term</li><li>Excluded: cosmetic wear, modification, third-party repairs</li></ul>",
+      "descriptionHtml": "<p>Two years of repair cover for pedals bought here, starting on the delivery date. Covers switch, jack and potentiometer failure, and accidental damage including liquid ingress and a dropped enclosure.</p><p>Choose the tier that matches the order you are covering: the Order Value option is the total purchase price the policy protects, and the premium is 10% of that. One claim per term. We pay return shipping both ways; if the pedal cannot be repaired we replace it with the same model.</p><ul><li>Term: 24 months from delivery</li><li>Claims: one per term</li><li>Transferable: once, if you sell the pedal</li><li>Excluded: cosmetic wear, modification, third-party repairs</li></ul>",
       "productType": "Service Plan",
       "vendor": "Hotwire Resistor",
-      "tags": ["warranty", "service plan"],
-      "price": "25.00"
+      "tags": ["warranty", "service plan", "repair cover"],
+      "variantPrices": {
+        "100": "10.00",
+        "200": "20.00",
+        "500": "50.00",
+        "1000": "100.00",
+        "1500": "150.00",
+        "2000": "200.00"
+      }
     },
     {
       "id": "7493707006207",
-      "_edit": "No description at all. Guessed as a print from the title — correct it.",
-      "title": "Floral Grass — Giclée Print, 30 × 40 cm",
-      "descriptionHtml": "<p>A giclée print of the Floral Grass study, 30 × 40 cm on 310gsm cotton rag with a 2cm unprinted border for framing.</p><p>Pigment inks rated for 100 years without noticeable fade under glass. Shipped flat between boards rather than rolled, so it needs no flattening before framing. Unframed.</p><ul><li>Size: 30 × 40 cm including border</li><li>Paper: 310gsm 100% cotton rag, matte</li><li>Edition: open</li></ul>",
+      "_note": "Three sizes (small/medium/large) already priced 1000/800/600. Prices left alone — the size axis is real and the existing spread is the merchant's call.",
+      "title": "Floral Grass — Giclée Print",
+      "descriptionHtml": "<p>A giclée print of the Floral Grass study, available in three sizes. Printed on 310gsm cotton rag with a matte surface and an unprinted border for framing.</p><p>Pigment inks rated for 100 years without noticeable fade under glass. Shipped flat between boards rather than rolled, so it needs no flattening before framing. Sold unframed; choose small, medium or large at checkout.</p><ul><li>Paper: 310gsm 100% cotton rag, matte</li><li>Border: unprinted, for framing</li><li>Edition: open</li><li>Ships: flat, between boards</li></ul>",
       "productType": "Print",
       "vendor": "Hotwire Resistor",
-      "tags": ["print", "wall art"],
-      "price": "600.00"
+      "tags": ["giclee print", "wall art", "unframed"]
     },
     {
       "id": "7493707038975",
-      "_edit": "No description at all. Guessed as a print from the title — correct it.",
-      "title": "Wandering Waterfall — Giclée Print, 20 × 30 cm",
-      "descriptionHtml": "<p>A giclée print of the Wandering Waterfall study, 20 × 30 cm on 310gsm cotton rag with a 2cm unprinted border for framing.</p><p>Pigment inks rated for 100 years without noticeable fade under glass. Shipped flat between boards rather than rolled. Unframed.</p><ul><li>Size: 20 × 30 cm including border</li><li>Paper: 310gsm 100% cotton rag, matte</li><li>Edition: open</li></ul>",
+      "_note": "Single variant at CA$100. No size axis, so the copy stays size-agnostic.",
+      "title": "Wandering Waterfall — Giclée Print",
+      "descriptionHtml": "<p>A giclée print of the Wandering Waterfall study, printed on 310gsm cotton rag with a matte surface and an unprinted border for framing.</p><p>Pigment inks rated for 100 years without noticeable fade under glass. Shipped flat between boards rather than rolled. Sold unframed, in a single size.</p><ul><li>Paper: 310gsm 100% cotton rag, matte</li><li>Border: unprinted, for framing</li><li>Edition: open</li><li>Ships: flat, between boards</li></ul>",
       "productType": "Print",
       "vendor": "Hotwire Resistor",
-      "tags": ["print", "wall art"],
-      "price": "100.00"
+      "tags": ["giclee print", "wall art", "unframed"]
     }
   ]
 }

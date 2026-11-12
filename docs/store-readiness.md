@@ -1,7 +1,8 @@
 # Store readiness — `hotwire-resistor.myshopify.com`
 
 Everything in the **Verified** sections below was observed directly against the live
-store on 2026-11-12, through the store's own UCP endpoints. Everything in
+store on 2026-11-12, through the store's own UCP endpoints. The catalog section
+records changes that have since been applied. Everything in
 **Needs confirming** is flagged as such because Shopify's public documentation does
 not state it and third-party write-ups disagree.
 
@@ -83,7 +84,7 @@ Shopify Payments and the agentic checkout terms, then re-run
 
 ---
 
-## Gap 3 — catalog quality
+## Gap 3 — catalog quality — largely closed
 
 Full detail in [`catalog-audit.md`](catalog-audit.md); regenerate any time with:
 
@@ -91,7 +92,44 @@ Full detail in [`catalog-audit.md`](catalog-audit.md); regenerate any time with:
 node scripts/audit-catalog.mjs --markdown docs/catalog-audit.md
 ```
 
-Current catalog average: **67%** across the 9 products exposed to agents.
+**Catalog average: 86%**, up from 67%. Six products are exposed to agents, down from
+nine, and three of the six now score 100%.
+
+### Applied on 2026-11-12
+
+Through [`scripts/fix-catalog.mjs`](../scripts/fix-catalog.mjs), from
+[`data/catalog-plan.json`](../data/catalog-plan.json):
+
+| Product | Change |
+| --- | --- |
+| `booger with no product` | set to **draft** — test data, zero price |
+| `Test 2022 new App Product` | set to **draft** — test data, zero price |
+| `BLACK GLASSES WITH BLACK RIMS` | set to **draft** — zero price, no category |
+| `Pedal Insurance` | retitled, 104-word description, type `Service Plan`, and **tiered pricing**: the `Order Value` axis (100–2000) was entirely zero-priced and is now 10% of covered value (CA$10–200) |
+| `floral grass` → `Floral Grass — Giclée Print` | retitled, 77-word description, type `Print`, vendor corrected from `Liquid Logic`. Its small/medium/large prices (1000/800/600) were **left alone** — the size axis is real and the spread is yours to set |
+| `wandering waterfall` → `Wandering Waterfall — Giclée Print` | retitled, 63-word description, type `Print`, vendor corrected from `Sweet Protection` |
+
+Drafts are reversible: flip the product's status back to Active in Shopify admin.
+
+### Held, pending your decision
+
+Two products were deliberately **not** rewritten. Reading the Admin API rather than
+the titles showed that what they are is genuinely unclear, and a confident description
+of the wrong product is the worst thing an agentic catalog can contain:
+
+- **`Stomper`** — 15 variants on a `Size` axis of 16–44 even. That is an apparel size
+  run, not hardware, and the existing women's one-piece swimsuit description is
+  consistent with it. So the *title* may be the placeholder rather than the body.
+  It still carries another company's support address in the copy, which should go
+  either way.
+- **`700r4`** — one variant at CA$480, product type `collection`, 18 words that never
+  mention the product. `700R4` reads as a GM transmission, but nothing in the store's
+  own data confirms it.
+
+### Still open on the products that were fixed
+
+- `Pedal Insurance` has **no image** and **no taxonomy category**. Both need a human:
+  an image file, and a category judgement for a service plan rather than a good.
 
 The headline problems, in the order they hurt an agent:
 
@@ -134,10 +172,25 @@ attached, option names real (`Resistance`, not `Title`).
 
 ## Order of work
 
-1. Fix or unpublish the two test products and the four zero-price products.
-2. Replace the mismatched and empty descriptions.
-3. Assign taxonomy categories and images.
-4. Re-run the audit; aim above 85%.
-5. Confirm the agentic sales channel is publishing everything you intend.
+1. ~~Fix or unpublish the test products and the zero-price products.~~ Done.
+2. ~~Replace the empty descriptions.~~ Done for the two prints.
+3. Decide what `Stomper` and `700r4` actually are, then rewrite them.
+4. Add an image and a category to `Pedal Insurance`.
+5. Confirm the agentic sales channel is publishing everything you intend — six
+   products are visible to agents; if the store holds more, the rest are unpublished
+   to that channel.
 6. Decide between waiting on global-catalog eligibility and shipping a saved catalog
    scoped to this store.
+
+---
+
+## A note on publishing the agent's own profile
+
+Not merchant-side, but it belongs with the verified findings.
+
+Shopify validates the `Cache-Control` header on the agent profile URL passed in
+`meta.ucp-agent.profile`. GitHub Pages serves JSON as `max-age=600`, which is
+rejected with `profile_malformed: Invalid cache control`, and Pages gives no way to
+change it. Serving the same file from the repository through jsDelivr
+(`public, max-age=604800`, `application/json`) is accepted. Both results were
+observed against this store, not inferred.

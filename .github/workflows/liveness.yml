@@ -18,6 +18,6 @@ jobs:
         with:
           node-version: '22'
       - name: Run the full agentic shopping cycle
-        run: node scripts/demo-cycle.mjs --query "stomper"
+        run: node scripts/demo-cycle.mjs --query "floral grass"
       - name: Audit catalog readiness
         run: node scripts/audit-catalog.mjs

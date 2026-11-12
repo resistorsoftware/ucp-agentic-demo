@@ -1,116 +1,8 @@
 {
   "store": "hotwire-resistor.myshopify.com",
-  "generated": "2026-11-12T19:12:42.392Z",
-  "average": 67,
+  "generated": "2026-11-12T19:32:15.411Z",
+  "average": 86,
   "products": [
-    {
-      "id": "gid://shopify/Product/7565612351743",
-      "title": "Test 2022 new App Product",
-      "handle": "test-2022-new-app-product",
-      "score": 48,
-      "findings": [
-        {
-          "check": "title",
-          "label": "Usable title",
-          "status": "fail",
-          "detail": "looks like test data (\"Test 2022 new App Product\")",
-          "fix": "Title the product the way a buyer would ask for it: brand, model, and what it is."
-        },
-        {
-          "check": "description",
-          "label": "Description an agent can quote",
-          "status": "warn",
-          "detail": "only 3 words",
-          "fix": "Write 40+ words of specifics: what it does, materials, compatibility, dimensions. No marketing filler."
-        },
-        {
-          "check": "price",
-          "label": "Real price",
-          "status": "fail",
-          "detail": "priced at zero — agents read this as unsellable or a placeholder",
-          "fix": "Set a non-zero price, or unpublish the product from the agentic channel."
-        },
-        {
-          "check": "category",
-          "label": "Taxonomy category",
-          "status": "fail",
-          "detail": "none",
-          "fix": "Assign a Shopify standard product category; agents and saved catalogs filter on it."
-        }
-      ]
-    },
-    {
-      "id": "gid://shopify/Product/7901822714111",
-      "title": "booger with no product",
-      "handle": "booger-with-no-product",
-      "score": 48,
-      "findings": [
-        {
-          "check": "title",
-          "label": "Usable title",
-          "status": "fail",
-          "detail": "looks like test data (\"booger with no product\")",
-          "fix": "Title the product the way a buyer would ask for it: brand, model, and what it is."
-        },
-        {
-          "check": "description",
-          "label": "Description an agent can quote",
-          "status": "warn",
-          "detail": "only 3 words",
-          "fix": "Write 40+ words of specifics: what it does, materials, compatibility, dimensions. No marketing filler."
-        },
-        {
-          "check": "price",
-          "label": "Real price",
-          "status": "fail",
-          "detail": "priced at zero — agents read this as unsellable or a placeholder",
-          "fix": "Set a non-zero price, or unpublish the product from the agentic channel."
-        },
-        {
-          "check": "category",
-          "label": "Taxonomy category",
-          "status": "fail",
-          "detail": "none",
-          "fix": "Assign a Shopify standard product category; agents and saved catalogs filter on it."
-        }
-      ]
-    },
-    {
-      "id": "gid://shopify/Product/8026142507263",
-      "title": "Pedal Insurance",
-      "handle": "pedal-insurance",
-      "score": 57,
-      "findings": [
-        {
-          "check": "description",
-          "label": "Description an agent can quote",
-          "status": "warn",
-          "detail": "only 7 words",
-          "fix": "Write 40+ words of specifics: what it does, materials, compatibility, dimensions. No marketing filler."
-        },
-        {
-          "check": "price",
-          "label": "Real price",
-          "status": "fail",
-          "detail": "priced at zero — agents read this as unsellable or a placeholder",
-          "fix": "Set a non-zero price, or unpublish the product from the agentic channel."
-        },
-        {
-          "check": "category",
-          "label": "Taxonomy category",
-          "status": "fail",
-          "detail": "none",
-          "fix": "Assign a Shopify standard product category; agents and saved catalogs filter on it."
-        },
-        {
-          "check": "media",
-          "label": "Image",
-          "status": "fail",
-          "detail": "none",
-          "fix": "Add at least one product image; agent surfaces render it next to the offer."
-        }
-      ]
-    },
     {
       "id": "gid://shopify/Product/7670628483327",
       "title": "700r4",
@@ -141,35 +33,6 @@
       ]
     },
     {
-      "id": "gid://shopify/Product/7895577985279",
-      "title": "BLACK GLASSES WITH BLACK RIMS",
-      "handle": "black-glasses-with-rims",
-      "score": 68,
-      "findings": [
-        {
-          "check": "title",
-          "label": "Usable title",
-          "status": "warn",
-          "detail": "all caps — reads as shouting to a buyer",
-          "fix": "Title the product the way a buyer would ask for it: brand, model, and what it is."
-        },
-        {
-          "check": "price",
-          "label": "Real price",
-          "status": "fail",
-          "detail": "priced at zero — agents read this as unsellable or a placeholder",
-          "fix": "Set a non-zero price, or unpublish the product from the agentic channel."
-        },
-        {
-          "check": "category",
-          "label": "Taxonomy category",
-          "status": "fail",
-          "detail": "none",
-          "fix": "Assign a Shopify standard product category; agents and saved catalogs filter on it."
-        }
-      ]
-    },
-    {
       "id": "gid://shopify/Product/7493707104511",
       "title": "Stomper",
       "handle": "silent-paper",
@@ -192,34 +55,40 @@
       ]
     },
     {
-      "id": "gid://shopify/Product/7493707006207",
-      "title": "floral grass",
-      "handle": "floral-grass",
-      "score": 75,
+      "id": "gid://shopify/Product/8026142507263",
+      "title": "Pedal Insurance — 24-Month Repair Cover",
+      "handle": "pedal-insurance",
+      "score": 85,
       "findings": [
         {
-          "check": "description",
-          "label": "Description an agent can quote",
+          "check": "category",
+          "label": "Taxonomy category",
           "status": "fail",
-          "detail": "empty — an agent has nothing to tell the buyer",
-          "fix": "Write 40+ words of specifics: what it does, materials, compatibility, dimensions. No marketing filler."
+          "detail": "none",
+          "fix": "Assign a Shopify standard product category; agents and saved catalogs filter on it."
+        },
+        {
+          "check": "media",
+          "label": "Image",
+          "status": "fail",
+          "detail": "none",
+          "fix": "Add at least one product image; agent surfaces render it next to the offer."
         }
       ]
     },
     {
+      "id": "gid://shopify/Product/7493707006207",
+      "title": "Floral Grass — Giclée Print",
+      "handle": "floral-grass",
+      "score": 100,
+      "findings": []
+    },
+    {
       "id": "gid://shopify/Product/7493707038975",
-      "title": "wandering waterfall",
+      "title": "Wandering Waterfall — Giclée Print",
       "handle": "wandering-waterfall",
-      "score": 75,
-      "findings": [
-        {
-          "check": "description",
-          "label": "Description an agent can quote",
-          "status": "fail",
-          "detail": "empty — an agent has nothing to tell the buyer",
-          "fix": "Write 40+ words of specifics: what it does, materials, compatibility, dimensions. No marketing filler."
-        }
-      ]
+      "score": 100,
+      "findings": []
     },
     {
       "id": "gid://shopify/Product/7895580475647",

@@ -5,7 +5,6 @@
  * see here is not a mock: it is the UCP conversation, run from the page.
  */
 import {
-  FALLBACK_AGENT_PROFILE,
   GLOBAL_CATALOG_ENDPOINT,
   UcpError,
   createCart,
@@ -20,7 +19,7 @@ import {
   totalsForDisplay,
   totalsReconcile,
 } from '../src/ucp-client.js';
-import { DEFAULT_CONTEXT } from '../src/config.js';
+import { DEFAULT_CONTEXT, PUBLISHED_AGENT_PROFILE } from '../src/config.js';
 
 const $ = (id) => document.getElementById(id);
 const exchanges = [];
@@ -28,26 +27,30 @@ const exchanges = [];
 /* ------------------------------------------------------------------ *
  * Our identity
  *
- * The merchant's server fetches this URL during negotiation, so it has to be
- * publicly reachable. On a localhost or file:// origin it cannot be, and we
- * fall back to a profile Shopify publishes — the demo still runs, it just
- * presents a borrowed identity. That distinction is shown in the header.
+ * Every UCP request carries `meta.ucp-agent.profile`, a URL the merchant's
+ * server fetches during negotiation. Two things must hold, and both were
+ * learned by being rejected:
+ *
+ *   1. It must be publicly reachable. A localhost URL fails outright.
+ *   2. Its `Cache-Control` must satisfy the merchant. GitHub Pages sends
+ *      `max-age=600`, which Shopify rejects as `Invalid cache control`.
+ *
+ * So the profile is served from this same repository through jsDelivr, which
+ * sends `public, max-age=604800`. That URL works from anywhere — including a
+ * page opened on localhost — so the demo always presents its own identity and
+ * never has to borrow one.
  * ------------------------------------------------------------------ */
 function resolveAgentProfile() {
-  const { origin, pathname, protocol, hostname } = window.location;
-  const isLocal = protocol === 'file:' || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(hostname);
-  if (isLocal) {
-    return { url: FALLBACK_AGENT_PROFILE, own: false, reason: 'this page is served locally, so its own profile URL is not reachable from Shopify' };
-  }
-  const base = pathname.replace(/\/[^/]*$/, '/');
-  return { url: `${origin}${base}ucp/agent-profile.json`, own: true };
+  const override = new URLSearchParams(window.location.search).get('profile');
+  if (override) return { url: override, own: false, reason: 'overridden by the ?profile= query parameter' };
+  return { url: PUBLISHED_AGENT_PROFILE, own: true };
 }
 
 const AGENT = resolveAgentProfile();
 const callOpts = { agentProfile: AGENT.url, onExchange: (e) => { exchanges.push(e); renderLog(); } };
 
 $('idProfile').textContent = AGENT.url;
-$('idProfileState').textContent = AGENT.own ? '(published by this repo)' : '(borrowed — see note)';
+$('idProfileState').textContent = AGENT.own ? '(published by this repo)' : '(overridden)';
 $('idProfileState').className = AGENT.own ? '' : 'unreachable';
 
 /* ------------------------------------------------------------------ *
@@ -132,7 +135,7 @@ function renderDiscovery(biz) {
 
   let notes = '';
   if (!AGENT.own) {
-    notes += note('', `<p><b>Borrowed agent identity.</b> ${esc(AGENT.reason)}. Published to GitHub Pages, this page presents its own profile at <code>ucp/agent-profile.json</code>.</p>`);
+    notes += note('', `<p><b>Agent identity ${esc(AGENT.reason)}.</b> The merchant is negotiating against that profile instead of this repo's own.</p>`);
   }
   notes += biz.paymentHandlers.length
     ? note('good', `<p><b>Agent-completable payment:</b> ${biz.paymentHandlers.map(esc).join(', ')}. An agent can complete checkout without handing the buyer off.</p>`)

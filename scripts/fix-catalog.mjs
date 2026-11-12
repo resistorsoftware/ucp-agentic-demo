@@ -15,7 +15,6 @@
  *   node scripts/fix-catalog.mjs --apply --only 7493707104511
  *
  * Required Admin API scopes: read_products, write_products.
- * Unpublishing also needs read_publications, write_publications.
  */
 import { readFileSync } from 'node:fs';
 import { c, kv, storeDomain } from '../src/node-env.js';
@@ -53,12 +52,33 @@ async function main() {
       continue;
     }
 
-    /* ---- Unpublish: the right fix for test data and placeholders ---- */
+    /* ---- Hold: the plan is not confident enough to write ----
+     * A wrong description is worse than a thin one, because an agent will
+     * state it to a buyer as fact. Holding is a result, not an omission.
+     */
+    if (item.action === 'hold') {
+      console.log(`    ${c.yellow('⏸')} held — ${item.reason || 'needs a human decision'}`);
+      continue;
+    }
+
+    /* ---- Unpublish: the right fix for test data and placeholders ----
+     *
+     * Implemented as a move to DRAFT rather than `publishableUnpublish`:
+     * draft removes the product from every sales channel at once, including
+     * the agentic one, and a single status flip undoes it. Unpublishing
+     * channel by channel needs the publication IDs and is easy to get
+     * half-done.
+     */
     if (item.action === 'unpublish') {
-      console.log(`    ${c.yellow('→')} unpublish from all sales channels  ${c.dim(item.reason || '')}`);
+      console.log(`    ${c.yellow('→')} set to DRAFT ${c.dim(`(current: ${current.status})`)}  ${c.dim(item.reason || '')}`);
+      if (current.status === 'DRAFT') {
+        console.log(`    ${c.dim('already draft — nothing to do')}`);
+        continue;
+      }
       if (apply) {
-        const res = await gql(UNPUBLISH, { id: gid });
-        if (reportErrors(res, 'publishableUnpublish')) failed += 1; else changed += 1;
+        const res = await gql(PRODUCT_UPDATE, { product: { id: gid, status: 'DRAFT' } });
+        if (reportErrors(res, 'productUpdate')) { failed += 1; continue; }
+        changed += 1;
       }
       continue;
     }
@@ -97,17 +117,29 @@ async function main() {
       if (reportErrors(res, 'productUpdate')) { failed += 1; continue; }
     }
 
-    /* ---- Variant prices ---- */
-    if (item.price != null) {
-      const variants = current.variants.map((v) => ({ id: v.id, price: String(item.price) }));
-      console.log(`    price        ${c.dim(current.variants.map((v) => v.price).join(', '))} → ${c.green(String(item.price))} ${c.dim(`(${variants.length} variant${variants.length === 1 ? '' : 's'})`)}`);
+    /* ---- Variant prices ----
+     *
+     * `price` sets every variant to one value. `variantPrices` maps a variant
+     * title to its own price, which is what you need whenever the option axis
+     * means something — a size run, or an insurance tier priced off order
+     * value. Flattening those to a single number destroys real information,
+     * so the two are deliberately separate.
+     */
+    const priceUpdates = resolvePrices(item, current.variants);
+    if (priceUpdates.length) {
+      for (const u of priceUpdates) {
+        console.log(`    price        ${c.dim(`${u.label}: ${u.from}`)} → ${c.green(u.price)}`);
+      }
       if (apply) {
-        const res = await gql(VARIANTS_UPDATE, { productId: gid, variants });
+        const res = await gql(VARIANTS_UPDATE, {
+          productId: gid,
+          variants: priceUpdates.map((u) => ({ id: u.id, price: u.price })),
+        });
         if (reportErrors(res, 'productVariantsBulkUpdate')) { failed += 1; continue; }
       }
     }
 
-    if (!hasProductChange && item.price == null) console.log(`    ${c.dim('nothing to change')}`);
+    if (!hasProductChange && !priceUpdates.length) console.log(`    ${c.dim('nothing to change')}`);
     else changed += 1;
   }
 
@@ -150,12 +182,33 @@ async function getProduct(id) {
   return { ...p, variants: p.variants.nodes };
 }
 
+
+/**
+ * Work out which variants need a new price, skipping any already correct.
+ * Returns [] when the plan asks for no price change.
+ */
+function resolvePrices(item, variants) {
+  const out = [];
+  for (const v of variants) {
+    let target = null;
+    if (item.variantPrices && Object.prototype.hasOwnProperty.call(item.variantPrices, v.title)) {
+      target = String(item.variantPrices[v.title]);
+    } else if (item.price != null) {
+      target = String(item.price);
+    }
+    if (target == null) continue;
+    if (Number(target) === Number(v.price)) continue;
+    out.push({ id: v.id, label: v.title, from: v.price, price: target });
+  }
+  return out;
+}
+
 const PRODUCT_QUERY = `
   query($id: ID!) {
     product(id: $id) {
-      id title descriptionHtml productType vendor tags
+      id title status descriptionHtml productType vendor tags
       category { fullName }
-      variants(first: 100) { nodes { id price } }
+      variants(first: 100) { nodes { id title price } }
     }
   }`;
 
@@ -175,14 +228,6 @@ const VARIANTS_UPDATE = `
     }
   }`;
 
-const UNPUBLISH = `
-  mutation($id: ID!) {
-    publishableUnpublish(id: $id, input: []) {
-      publishable { availablePublicationsCount { count } }
-      userErrors { field message }
-    }
-  }`;
-
 /* ------------------------------------------------------------------ *
  * Plumbing
  * ------------------------------------------------------------------ */
@@ -193,7 +238,7 @@ function resolveToken(a) {
   if (t) return t.trim();
   console.error(`\n${c.red('✗')} No Admin API token.\n\n` +
     '  Shopify admin → Settings → Apps and sales channels → Develop apps → Create an app\n' +
-    '  Admin API scopes: read_products, write_products, read_publications, write_publications\n' +
+    '  Admin API scopes: read_products, write_products\n' +
     '  Install, reveal the token, then:\n\n' +
     '    export SHOPIFY_ADMIN_TOKEN="shpat_…"\n\n' +
     '  Keep it out of this repository.\n');

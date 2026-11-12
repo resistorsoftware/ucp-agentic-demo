@@ -8,14 +8,21 @@
 import { FALLBACK_AGENT_PROFILE } from './ucp-client.js';
 import { DEFAULT_CONTEXT, DEFAULT_STORE_DOMAIN, PUBLISHED_AGENT_PROFILE } from './config.js';
 
+/*
+ * By default we present this repo's own published profile — it is reachable
+ * from anywhere and carries a Cache-Control header Shopify accepts. Set
+ * UCP_USE_SHOPIFY_PROFILE=1 to negotiate as one of Shopify's reference agents
+ * instead, which is useful for isolating whether a failure is ours or theirs.
+ */
+
 export function storeDomain() {
   return process.env.UCP_STORE_DOMAIN || DEFAULT_STORE_DOMAIN;
 }
 
 export function agentProfile() {
   if (process.env.UCP_AGENT_PROFILE) return process.env.UCP_AGENT_PROFILE;
-  if (process.env.UCP_USE_PUBLISHED_PROFILE === '1') return PUBLISHED_AGENT_PROFILE;
-  return FALLBACK_AGENT_PROFILE;
+  if (process.env.UCP_USE_SHOPIFY_PROFILE === '1') return FALLBACK_AGENT_PROFILE;
+  return PUBLISHED_AGENT_PROFILE;
 }
 
 export function buyerContext() {
