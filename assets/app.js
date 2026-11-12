@@ -18,8 +18,8 @@ import {
   searchCatalog,
   totalsForDisplay,
   totalsReconcile,
-} from '../src/ucp-client.js';
-import { DEFAULT_CONTEXT, PUBLISHED_AGENT_PROFILE } from '../src/config.js';
+} from '../src/ucp-client.js?v=2';
+import { DEFAULT_CONTEXT, PUBLISHED_AGENT_PROFILE } from '../src/config.js?v=2';
 
 const $ = (id) => document.getElementById(id);
 const exchanges = [];
