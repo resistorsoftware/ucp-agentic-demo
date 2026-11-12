@@ -1,0 +1,17 @@
+{
+  "name": "ucp-agentic-demo",
+  "version": "1.0.0",
+  "description": "A complete agentic shopping cycle over the Universal Commerce Protocol, against a live Shopify store. Browser demo plus Node scripts, no dependencies.",
+  "type": "module",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/resistorsoftware/ucp-agentic-demo.git" },
+  "homepage": "https://resistorsoftware.github.io/ucp-agentic-demo/",
+  "keywords": ["ucp", "universal-commerce-protocol", "agentic-commerce", "shopify", "mcp"],
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "demo": "node scripts/demo-cycle.mjs",
+    "audit": "node scripts/audit-catalog.mjs --markdown docs/catalog-audit.md --json docs/catalog-audit.json",
+    "fix": "node scripts/fix-catalog.mjs",
+    "serve": "python3 -m http.server 4173"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "query": "footswitch",
+  "context": {
+    "intent": "3PDT true-bypass footswitch for a pedal build",
+    "address_country": "CA",
+    "currency": "CAD",
+    "language": "en-CA"
+  },
+  "filters": {
+    "available": true,
+    "price": { "max": 20000 }
+  },
+  "pagination": { "limit": 10 }
+}

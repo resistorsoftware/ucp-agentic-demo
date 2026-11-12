@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+*.log
+transcript.json
+
+# Never commit Shopify credentials. The Admin API token belongs in your
+# environment or in a file outside this repository.
+.env
+.env.*
+*.token
+secrets/

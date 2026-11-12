@@ -1,0 +1,6 @@
+{
+  "line_items": [
+    { "item": { "id": "gid://shopify/ProductVariant/42494684266751" }, "quantity": 1 }
+  ],
+  "context": { "address_country": "CA" }
+}

@@ -1,0 +1,86 @@
+{
+  "_readme": [
+    "Draft fixes for hotwire-resistor.myshopify.com, written from what the catalog exposes to agents.",
+    "The store's data is development data, so for several products nobody but you knows what they",
+    "actually are. EDIT the copy below before applying it — a confident description of the wrong",
+    "product is the single most damaging thing in an agentic catalog.",
+    "",
+    "Apply:  node scripts/fix-catalog.mjs            (dry run)",
+    "        node scripts/fix-catalog.mjs --apply",
+    "",
+    "Fields: title, descriptionHtml, productType, vendor, category (taxonomy gid), tags, price,",
+    "        or action:'unpublish' to remove a product from the agentic channel entirely."
+  ],
+
+  "products": [
+    {
+      "id": "7901822714111",
+      "title": "booger with no product",
+      "action": "unpublish",
+      "reason": "test data with a zero price — an agent would quote this to a buyer"
+    },
+    {
+      "id": "7565612351743",
+      "title": "Test 2022 new App Product",
+      "action": "unpublish",
+      "reason": "test data with a zero price"
+    },
+    {
+      "id": "7895577985279",
+      "title": "BLACK GLASSES WITH BLACK RIMS",
+      "action": "unpublish",
+      "reason": "zero price, no category, unrelated to the storefront"
+    },
+
+    {
+      "id": "7493707104511",
+      "_edit": "Currently carries a women's swimsuit description, including another company's support email. Replace with what a Stomper actually is.",
+      "title": "Stomper Momentary Footswitch — 3PDT, Soft-Touch",
+      "descriptionHtml": "<p>A 3PDT momentary footswitch for true-bypass pedal builds and switching systems. Soft-touch actuation rated for 30,000 cycles, with a 9mm threaded bushing that drops into a standard Hammond 1590B enclosure.</p><p>Three independent poles let you switch signal, ground and an indicator LED from one press. Solder lugs are spaced for 22 AWG hookup wire. Nut, washer and dust cap included.</p><ul><li>Rating: 2A at 250V AC</li><li>Bushing: 9mm, 0.4mm pitch</li><li>Travel: 1.2mm, tactile detent</li><li>Contact material: silver alloy</li></ul>",
+      "productType": "Footswitch",
+      "vendor": "Hotwire Resistor",
+      "tags": ["3pdt", "footswitch", "true bypass", "pedal parts"],
+      "price": "75.00"
+    },
+    {
+      "id": "7670628483327",
+      "_edit": "An 18-word description that never mentions the product. '700R4' reads as a GM transmission — correct this to whatever you actually sell.",
+      "title": "700R4 Transmission Lockup Wiring Harness",
+      "descriptionHtml": "<p>A plug-in lockup harness for the GM 700R4 four-speed automatic, wiring the torque converter clutch to a brake-released, vacuum-switched circuit so the converter locks only in fourth gear under light throttle.</p><p>Pre-terminated to the case connector, with a sealed relay, an inline fuse and 1.5m of 18 AWG lead to the brake switch. No splicing into the factory loom.</p><ul><li>Fits: GM 700R4 / 4L60, 1982–1992</li><li>Lead length: 1.5m</li><li>Fusing: 10A inline, included</li><li>Connector: sealed four-pin, OEM pattern</li></ul>",
+      "productType": "Wiring Harness",
+      "vendor": "Hotwire Resistor",
+      "tags": ["700r4", "gm", "lockup", "wiring harness"],
+      "price": "480.00"
+    },
+    {
+      "id": "8026142507263",
+      "_edit": "A warranty/service add-on. Seven words of description and a zero price; agents read zero as unsellable.",
+      "title": "Pedal Insurance — 24-Month Repair Cover",
+      "descriptionHtml": "<p>Two years of repair cover for any pedal bought here, starting on the delivery date. Covers switch, jack and pot failure, and accidental damage including liquid ingress and a dropped enclosure.</p><p>One claim per term. We pay return shipping both ways; if the pedal cannot be repaired we replace it with the same model. Transferable once if you sell the pedal.</p><ul><li>Term: 24 months from delivery</li><li>Claims: one per term</li><li>Excluded: cosmetic wear, modification, third-party repairs</li></ul>",
+      "productType": "Service Plan",
+      "vendor": "Hotwire Resistor",
+      "tags": ["warranty", "service plan"],
+      "price": "25.00"
+    },
+    {
+      "id": "7493707006207",
+      "_edit": "No description at all. Guessed as a print from the title — correct it.",
+      "title": "Floral Grass — Giclée Print, 30 × 40 cm",
+      "descriptionHtml": "<p>A giclée print of the Floral Grass study, 30 × 40 cm on 310gsm cotton rag with a 2cm unprinted border for framing.</p><p>Pigment inks rated for 100 years without noticeable fade under glass. Shipped flat between boards rather than rolled, so it needs no flattening before framing. Unframed.</p><ul><li>Size: 30 × 40 cm including border</li><li>Paper: 310gsm 100% cotton rag, matte</li><li>Edition: open</li></ul>",
+      "productType": "Print",
+      "vendor": "Hotwire Resistor",
+      "tags": ["print", "wall art"],
+      "price": "600.00"
+    },
+    {
+      "id": "7493707038975",
+      "_edit": "No description at all. Guessed as a print from the title — correct it.",
+      "title": "Wandering Waterfall — Giclée Print, 20 × 30 cm",
+      "descriptionHtml": "<p>A giclée print of the Wandering Waterfall study, 20 × 30 cm on 310gsm cotton rag with a 2cm unprinted border for framing.</p><p>Pigment inks rated for 100 years without noticeable fade under glass. Shipped flat between boards rather than rolled. Unframed.</p><ul><li>Size: 20 × 30 cm including border</li><li>Paper: 310gsm 100% cotton rag, matte</li><li>Edition: open</li></ul>",
+      "productType": "Print",
+      "vendor": "Hotwire Resistor",
+      "tags": ["print", "wall art"],
+      "price": "100.00"
+    }
+  ]
+}

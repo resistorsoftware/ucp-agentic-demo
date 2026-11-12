@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UCP agentic shopping demo — hotwire-resistor</title>
+<meta name="description" content="A browser-based Universal Commerce Protocol agent: discovers a Shopify merchant, searches the global and storefront catalogs, and builds a real cart.">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="site">
+    <span class="badge">UCP 2026-08-25 · live</span>
+    <h1>Agentic shopping, end to end</h1>
+    <p class="lede">
+      This page is a Universal Commerce Protocol agent. It runs entirely in your browser:
+      no server, no API key. It reads a merchant's published UCP profile, negotiates a version,
+      searches both Shopify's cross-merchant global catalog and the merchant's own storefront
+      catalog, and assembles a real cart with real totals. Every request is shown verbatim
+      in the protocol log at the bottom.
+    </p>
+    <div class="identity">
+      <div>agent profile &nbsp;<b id="idProfile">resolving…</b> <span id="idProfileState"></span></div>
+      <div>merchant &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b id="idStore">—</b></div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div class="field">
+      <label for="store">Merchant domain</label>
+      <input type="text" id="store" value="hotwire-resistor.myshopify.com" spellcheck="false" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="query">What the buyer wants</label>
+      <input type="text" id="query" value="stomper" spellcheck="false" autocomplete="off">
+    </div>
+    <button id="run">Run the full cycle</button>
+    <button id="reset" class="ghost">Reset</button>
+  </div>
+  <p class="hint">
+    The cycle stops at the cart. Nothing is purchased, and no card details are ever collected by this page.
+  </p>
+
+  <section class="step" id="stepDiscover" hidden>
+    <h2><span class="n">1</span> Discovery and negotiation <span class="tool">GET /.well-known/ucp</span></h2>
+    <div class="body" id="discoverBody"></div>
+  </section>
+
+  <section class="step" id="stepSearch" hidden>
+    <h2><span class="n">2</span> Search <span class="tool">search_catalog</span></h2>
+    <div class="body">
+      <div class="columns">
+        <div class="col">
+          <h3>Global catalog — all of Shopify</h3>
+          <p class="sub">catalog.shopify.com/api/ucp/mcp</p>
+          <div id="globalResults"></div>
+        </div>
+        <div class="col">
+          <h3>Storefront catalog — this merchant only</h3>
+          <p class="sub" id="storeEndpointLabel">—</p>
+          <div id="storeResults"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="step" id="stepCart" hidden>
+    <h2><span class="n">3</span> Cart <span class="tool">create_cart</span></h2>
+    <div class="body" id="cartBody"></div>
+  </section>
+
+  <section class="step log" id="stepLog" hidden>
+    <h2><span class="n">4</span> Protocol log <span class="tool">JSON-RPC 2.0 over the MCP binding</span></h2>
+    <div class="body" id="logBody"></div>
+  </section>
+
+  <footer class="site">
+    <p>
+      Built with <a href="https://ucp.dev/2026-08-25/specification/overview/">UCP 2026-08-25</a>
+      against <a href="https://shopify.dev/docs/agents">Shopify's agent surfaces</a>.
+      Source and the store-readiness checklist:
+      <a href="https://github.com/resistorsoftware/ucp-agentic-demo">github.com/resistorsoftware/ucp-agentic-demo</a>.
+    </p>
+    <p>
+      Catalog data belongs to the merchants that published it and is shown here only to demonstrate
+      buyer-facing agent behaviour, with attribution and checkout links intact.
+    </p>
+  </footer>
+
+</div>
+<script type="module" src="assets/app.js"></script>
+</body>
+</html>

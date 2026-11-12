@@ -1,0 +1,23 @@
+# Proves the demo is not a recording: runs the real UCP cycle against the live
+# store on every push and once a day, and fails if the merchant stops answering.
+name: UCP cycle
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run the full agentic shopping cycle
+        run: node scripts/demo-cycle.mjs --query "stomper"
+      - name: Audit catalog readiness
+        run: node scripts/audit-catalog.mjs
