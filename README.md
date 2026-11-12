@@ -88,7 +88,7 @@ npx @shopify/ucp-cli discover --business https://hotwire-resistor.myshopify.com
 npx @shopify/ucp-cli catalog search --business https://hotwire-resistor.myshopify.com --input @examples/search.json
 ```
 
-## Two things worth knowing, both learned the hard way
+## Three things worth knowing, all learned the hard way
 
 **Publishing an agent identity is harder than it looks.** Every UCP request carries
 `meta.ucp-agent.profile`, a URL the merchant's server *fetches* during negotiation,
@@ -116,6 +116,14 @@ blocked. Sending the same JSON body as a CORS-simple request
 (`Content-Type: text/plain;charset=UTF-8`, no `Accept` header) skips the preflight
 and succeeds. That single detail is what makes a serverless demo possible; see
 `corsSimpleHeaders` in [`src/ucp-client.js`](src/ucp-client.js).
+
+**`get_product` resolves, it does not enumerate.** Called with no `selected` or
+`preferences`, it comes back carrying a *single* variant rather than the whole matrix,
+while the preceding `search_catalog` response carries them all. An agent that selects
+from `get_product` alone will quietly cart whichever variant the merchant resolved to
+— on a three-size print here, that was the most expensive one. The demo reads the
+option matrix from `get_product` and picks the variant from whichever response lists
+them all.
 
 ## What the agent is obliged to do
 

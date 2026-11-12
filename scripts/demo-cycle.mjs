@@ -132,12 +132,23 @@ async function main() {
   const chosen = local.products[0];
   const detail = await getProduct({ endpoint: biz.endpoint, id: chosen.id }, { agentProfile: profile });
   const product = detail.product || chosen;
-  const variant = pickVariant(product);
+
+  /*
+   * `get_product` resolves to a selection: with no `selected`/`preferences` it
+   * comes back carrying a single variant, not the whole matrix. The search
+   * result, meanwhile, carries the full variant array. So read the option
+   * matrix from get_product (it is the live one) but choose the variant from
+   * whichever response actually lists them all — otherwise a three-size print
+   * silently carts as whichever size the merchant happened to resolve to.
+   */
+  const variantSource = ((chosen.variants || []).length > (product.variants || []).length) ? chosen : product;
+  const variant = pickVariant(variantSource);
   if (!variant) fail(`Product "${product.title}" exposes no variants.`);
   if (!asJson) {
     kv('product', product.title);
     kv('options', (product.options || []).map((o) => `${o.name}(${(o.values || o.labels || []).length})`).join(' ') || '—');
-    kv('variant', variant.id);
+    kv('variant', `${variant.id}${variant.title ? ` (${variant.title})` : ''}`);
+    kv('chosen from', variantSource === product ? 'get_product' : `search result (${(chosen.variants || []).length} variants)`);
     kv('variant price', formatMoney(variant.price?.amount, variant.price?.currency || product.price_range?.min?.currency));
   }
   record('selection', { productId: product.id, title: product.title, variantId: variant.id });
