@@ -8,6 +8,7 @@ import {
   GLOBAL_CATALOG_ENDPOINT,
   UcpError,
   createCart,
+  createCheckout,
   descriptionText,
   discoverBusiness,
   formatMoney,
@@ -18,8 +19,8 @@ import {
   searchCatalog,
   totalsForDisplay,
   totalsReconcile,
-} from '../src/ucp-client.js?v=3';
-import { DEFAULT_CONTEXT, PUBLISHED_AGENT_PROFILE } from '../src/config.js?v=3';
+} from '../src/ucp-client.js?v=4';
+import { DEFAULT_CONTEXT, PUBLISHED_AGENT_PROFILE } from '../src/config.js?v=4';
 
 const $ = (id) => document.getElementById(id);
 const exchanges = [];
@@ -64,10 +65,11 @@ $('store').addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); })
 
 function reset() {
   exchanges.length = 0;
-  for (const id of ['stepDiscover', 'stepSearch', 'stepCart', 'stepLog']) $(id).hidden = true;
+  for (const id of ['stepDiscover', 'stepSearch', 'stepCart', 'stepCheckout', 'stepLog']) $(id).hidden = true;
   $('globalResults').innerHTML = '';
   $('storeResults').innerHTML = '';
   $('cartBody').innerHTML = '';
+  $('checkoutBody').innerHTML = '';
   $('logBody').innerHTML = '';
 }
 
@@ -139,7 +141,7 @@ function renderDiscovery(biz) {
   }
   notes += biz.paymentHandlers.length
     ? note('good', `<p><b>Agent-completable payment:</b> ${biz.paymentHandlers.map(esc).join(', ')}. An agent can complete checkout without handing the buyer off.</p>`)
-    : note('', `<p><b>No agent payment handler advertised.</b> <code>payment_handlers</code> is empty, so <code>complete_checkout</code> would return <code>requires_escalation</code> and the buyer finishes at the merchant's own checkout. That is a correct UCP outcome, not a failure — and it is why this demo stops at the cart.</p>`);
+    : note('', `<p><b>No agent payment handler advertised.</b> <code>payment_handlers</code> is empty, so even an authenticated agent could not settle here — <code>complete_checkout</code> would escalate and the buyer would finish at the merchant's own checkout. A correct UCP outcome, not a failure. It is <em>not</em> what stops this page, though: see step 4.</p>`);
 
   $('discoverBody').innerHTML = `
     <dl class="facts">
@@ -235,6 +237,7 @@ async function addToCart(product, domain, endpoint, btn) {
       context: { address_country: DEFAULT_CONTEXT.address_country },
     }, callOpts);
     renderCart(cart, product, variant, domain);
+    await buildCheckout(cart, product, variant, domain, endpoint);
   } catch (err) {
     $('cartBody').innerHTML = errorHtml(err);
   } finally {
@@ -268,7 +271,6 @@ async function cartAtOtherMerchant(product, domain, btn) {
 function renderCart(cart, product, variant, domain) {
   const rows = totalsForDisplay(cart.totals, cart.currency);
   const rec = totalsReconcile(cart.totals);
-  const url = handoffUrl({ continueUrl: cart.continueUrl, variant, product, domain });
 
   const totalsHtml = rows.length
     ? `<table class="totals">${rows.map((r) => `
@@ -301,10 +303,102 @@ function renderCart(cart, product, variant, domain) {
       ? '<p>Line entries sum to the stated total.</p>'
       : '<p><b>Totals do not reconcile.</b> The merchant\'s totals still stand for display, but an agent must not complete this checkout on its own — escalate to the buyer for review.</p>') : ''}
     ${messagesHtml}
+    ${note('', `<p>This is a real, retrievable cart at ${esc(domain)}. The agent now converts it into a
+      checkout — still with no credentials.</p>`)}`;
+}
+
+/* ------------------------------------------------------------------ *
+ * Checkout
+ *
+ * `create_checkout` answers an anonymous agent — verified against a live
+ * store. Only `complete_checkout` demands a credential. So the honest ceiling
+ * for a page that holds no secret is a fully priced, validated checkout, and
+ * that is a far better thing to show than a cart.
+ * ------------------------------------------------------------------ */
+
+async function buildCheckout(cart, product, variant, domain, endpoint) {
+  $('stepCheckout').hidden = false;
+  $('checkoutBody').innerHTML = '<span class="spinner"></span>';
+  try {
+    const { checkout } = await createCheckout({
+      endpoint,
+      cartId: cart.id,
+      context: { address_country: DEFAULT_CONTEXT.address_country },
+    }, callOpts);
+    renderCheckout(checkout, product, variant, domain);
+  } catch (err) {
+    /* The cart's continue_url is still a valid handoff, so offer it here
+       rather than leaving the buyer with nowhere to go. */
+    const url = handoffUrl({ continueUrl: cart.continueUrl, variant, product, domain });
+    $('checkoutBody').innerHTML = errorHtml(err) + (url
+      ? note('', `<p>The cart still stands. Hand the buyer off:
+          <a href="${esc(url)}" target="_blank" rel="noopener">${esc(url)}</a></p>`)
+      : '');
+  }
+}
+
+function renderCheckout(checkout, product, variant, domain) {
+  const rows = totalsForDisplay(checkout.totals, checkout.currency);
+  const rec = totalsReconcile(checkout.totals);
+  const url = handoffUrl({ continueUrl: checkout.continueUrl, variant, product, domain });
+  const instruments = (checkout.payment && checkout.payment.instruments) || [];
+
+  const totalsHtml = rows.length
+    ? `<table class="totals">${rows.map((r) => `
+        <tr class="${r.type === 'total' ? 'total' : ''}"><td>${esc(r.label)}</td><td class="amt">${esc(r.amount)}</td></tr>
+        ${r.lines.map((l) => `<tr class="sub"><td>${esc(l.label)}</td><td class="amt">${esc(l.amount)}</td></tr>`).join('')}
+      `).join('')}</table>`
+    : '<p class="empty">The merchant returned no totals.</p>';
+
+  /* A checkout's errors are the interesting part: each one names something an
+     agent must resolve with update_checkout, or hand the buyer off for. */
+  const messagesHtml = (checkout.messages || []).map((m) => {
+    if (m.type === 'error') {
+      const sev = m.severity || 'error';
+      const cls = sev === 'unrecoverable' ? 'disclosure' : 'notice';
+      return `<div class="msg ${cls}"><span class="lbl">${esc(sev)}</span>${esc(m.content || m.code || '')}</div>`;
+    }
+    const ob = messageObligation(m);
+    const label = { disclosure: 'Must be shown', notice: 'Notice', info: 'Info' }[ob] || 'Info';
+    return `<div class="msg ${ob}"><span class="lbl">${label}</span>${esc(m.content || m.code || '')}</div>`;
+  }).join('');
+
+  const statusNote = checkout.status === 'incomplete'
+    ? note('', `<p><b>Status <code>incomplete</code> is the correct outcome here</b>, not a failure. The
+        merchant is naming what it still needs. Each recoverable error above is something an agent
+        resolves with <code>update_checkout</code> — or, for anything requiring buyer input, hands off
+        for.</p>`)
+    : '';
+
+  $('checkoutBody').innerHTML = `
+    <dl class="facts">
+      <dt>merchant</dt><dd>${esc(domain)}</dd>
+      <dt>checkout id</dt><dd>${esc(checkout.id || '—')}</dd>
+      <dt>status</dt><dd>${esc(checkout.status || '—')}</dd>
+      <dt>payment instruments</dt><dd>${instruments.length
+        ? instruments.map((i) => esc(i.type || i.id || 'instrument')).join(', ')
+        : 'none offered'}</dd>
+    </dl>
+    <p class="hint">
+      No API key, no request signature — the same anonymous identity that ran every step above.
+      A real checkout, priced by the merchant.
+    </p>
+    ${totalsHtml}
+    ${rec.checked ? note(rec.ok ? 'good' : 'bad', rec.ok
+      ? '<p>Line entries sum to the stated total.</p>'
+      : '<p><b>Totals do not reconcile.</b> The merchant\'s totals still stand for display, but an agent must not complete this checkout on its own — escalate to the buyer for review.</p>') : ''}
+    ${messagesHtml}
+    ${statusNote}
+    ${note('bad', `<p><b>This is where the page stops, and it is an authentication ceiling.</b>
+      <code>complete_checkout</code> answers an anonymous agent with
+      <code>AuthenticationRequired</code> — it needs a Token-tier JWT from a Shopify Dev Dashboard
+      agent identity, plus the buyer's real IP in a <code>Shopify-Buyer-IP</code> header. A static
+      page cannot hold that secret, so it does not pretend to.</p>
+      <p>That refusal lands <em>before</em> the merchant's payment configuration is consulted. The
+      empty <code>payment_handlers</code> from step 1 is a second blocker behind it — real, but
+      never reached from here.</p>`)}
     ${url ? `<p style="margin-top:16px"><a href="${esc(url)}" target="_blank" rel="noopener"><b>Hand off to the buyer →</b></a><br>
-      <span class="hint">${esc(url)}</span></p>` : ''}
-    ${note('', `<p>This is a real, retrievable cart at ${esc(domain)}. The cycle stops here: completing a
-      checkout moves money, so it stays a deliberate, separate step.</p>`)}`;
+      <span class="hint">${esc(url)}</span></p>` : ''}`;
 }
 
 function renderLog() {
