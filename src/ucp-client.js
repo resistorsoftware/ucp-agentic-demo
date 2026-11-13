@@ -334,13 +334,95 @@ export async function createCheckout({ endpoint, cartId, lineItems, context, buy
   return { checkout: normalizeCheckout(payload), exchange };
 }
 
-/** `update_checkout` — full replace on `line_items`, same rule as the cart. */
+/**
+ * `update_checkout` — full replace on `line_items`, same rule as the cart, and
+ * the rule that bites hardest here: send an empty array and the merchant
+ * empties the checkout, then reports that it cannot ship an empty order. The
+ * misleading error is downstream of your own payload, not the store's setup.
+ *
+ * `id` is a TOP-LEVEL argument, not a field of `checkout` — unlike every other
+ * operation in this file. The merchant rejects it as "Missing required
+ * arguments: id" otherwise.
+ */
 export async function updateCheckout({ endpoint, id, lineItems, buyer, fulfillment }, options = {}) {
-  const checkout = { id, line_items: lineItems || [] };
+  const checkout = { line_items: lineItems || [] };
   if (buyer) checkout.buyer = buyer;
   if (fulfillment) checkout.fulfillment = fulfillment;
-  const { payload, exchange } = await callTool(endpoint, 'update_checkout', { checkout }, options);
+  const { payload, exchange } = await callTool(endpoint, 'update_checkout', { id, checkout }, options);
   return { checkout: normalizeCheckout(payload), exchange };
+}
+
+/**
+ * Carry a checkout's line items forward, for the full-replace rule above.
+ *
+ * The schema requires `item.id` to be a PRODUCT VARIANT id, not the line id —
+ * and requires it on every entry. A merchant's line item does not always
+ * expose that variant id where you expect it, and an entry built without one
+ * serialises to `{"item":{}}`: structurally present, semantically empty.
+ *
+ * This merchant accepts such a payload rather than rejecting it, and answers
+ * with a checkout carrying no fulfillment methods at all — which reads as "no
+ * delivery options offered" when the truth is "you sent an unusable line".
+ * Hence `fallbackVariantId`, and hence throwing rather than guessing: a loud
+ * failure here is worth far more than a quiet, plausible wrong answer.
+ */
+export function carryLineItems(checkout, { fallbackVariantId } = {}) {
+  return (checkout.lineItems || []).map((li) => {
+    const variantId = (li.item && li.item.id)
+      || (li.variant && li.variant.id)
+      || li.variant_id
+      || fallbackVariantId;
+    if (!variantId) {
+      throw new UcpError(
+        'Cannot carry this line item forward: no product variant id on it, and no fallback given. '
+        + 'Sending it anyway would silently produce a checkout with no delivery options.',
+        { code: 'LINE_ITEM_UNRESOLVED', data: li },
+      );
+    }
+    return {
+      ...(li.id ? { id: li.id } : {}),
+      item: { id: variantId },
+      quantity: li.quantity == null ? 1 : li.quantity,
+    };
+  });
+}
+
+/**
+ * The delivery options a merchant offered, flattened for display.
+ *
+ * Options are nested one level deeper than you would guess:
+ * `fulfillment.methods[].groups[].options[]`. A delivery GROUP is the unit
+ * that gets its own rates — split a basket across locations or ship-from
+ * points and you get several groups, each with its own option list and its own
+ * `selected_option_id`. A single-item order has exactly one group, which makes
+ * the extra level easy to miss in a truncated dump and easy to code past.
+ *
+ * Reading `methods[].options` instead finds nothing and reports it as "the
+ * merchant offered no delivery options" — wrong, and defamatory about the
+ * merchant. Both shapes are accepted here; the group id travels with each
+ * option, since selecting one means naming its group.
+ */
+export function deliveryOptions(checkout) {
+  const methods = (checkout.fulfillment && checkout.fulfillment.methods) || [];
+  const out = [];
+  const take = (o, container, method, groupId) => {
+    const total = (o.totals || []).find((t) => t.type === 'total') || (o.totals || [])[0];
+    out.push({
+      id: o.id,
+      groupId: groupId || null,
+      title: o.title || 'Delivery',
+      description: (o.description && (o.description.plain || o.description.html)) || '',
+      amount: total ? total.amount : null,
+      selected: o.id === container.selected_option_id,
+      methodType: method.type || 'shipping',
+    });
+  };
+  for (const m of methods) {
+    for (const g of m.groups || []) for (const o of g.options || []) take(o, g, m, g.id);
+    /* Some merchants put options straight on the method. Accept that too. */
+    for (const o of m.options || []) take(o, m, m, null);
+  }
+  return out;
 }
 
 /**

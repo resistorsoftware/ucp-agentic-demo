@@ -7,8 +7,10 @@
 import {
   GLOBAL_CATALOG_ENDPOINT,
   UcpError,
+  carryLineItems,
   createCart,
   createCheckout,
+  deliveryOptions,
   descriptionText,
   discoverBusiness,
   formatMoney,
@@ -19,8 +21,9 @@ import {
   searchCatalog,
   totalsForDisplay,
   totalsReconcile,
-} from '../src/ucp-client.js?v=4';
-import { DEFAULT_CONTEXT, PUBLISHED_AGENT_PROFILE } from '../src/config.js?v=4';
+  updateCheckout,
+} from '../src/ucp-client.js?v=5';
+import { DEFAULT_CONTEXT, DEMO_DESTINATION, PUBLISHED_AGENT_PROFILE } from '../src/config.js?v=5';
 
 const $ = (id) => document.getElementById(id);
 const exchanges = [];
@@ -65,11 +68,12 @@ $('store').addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); })
 
 function reset() {
   exchanges.length = 0;
-  for (const id of ['stepDiscover', 'stepSearch', 'stepCart', 'stepCheckout', 'stepLog']) $(id).hidden = true;
+  for (const id of ['stepDiscover', 'stepSearch', 'stepCart', 'stepCheckout', 'stepDelivery', 'stepLog']) $(id).hidden = true;
   $('globalResults').innerHTML = '';
   $('storeResults').innerHTML = '';
   $('cartBody').innerHTML = '';
   $('checkoutBody').innerHTML = '';
+  $('deliveryBody').innerHTML = '';
   $('logBody').innerHTML = '';
 }
 
@@ -326,6 +330,7 @@ async function buildCheckout(cart, product, variant, domain, endpoint) {
       context: { address_country: DEFAULT_CONTEXT.address_country },
     }, callOpts);
     renderCheckout(checkout, product, variant, domain);
+    await addDelivery(checkout, product, variant, domain, endpoint);
   } catch (err) {
     /* The cart's continue_url is still a valid handoff, so offer it here
        rather than leaving the buyer with nowhere to go. */
@@ -340,7 +345,6 @@ async function buildCheckout(cart, product, variant, domain, endpoint) {
 function renderCheckout(checkout, product, variant, domain) {
   const rows = totalsForDisplay(checkout.totals, checkout.currency);
   const rec = totalsReconcile(checkout.totals);
-  const url = handoffUrl({ continueUrl: checkout.continueUrl, variant, product, domain });
   const instruments = (checkout.payment && checkout.payment.instruments) || [];
 
   const totalsHtml = rows.length
@@ -389,6 +393,94 @@ function renderCheckout(checkout, product, variant, domain) {
       : '<p><b>Totals do not reconcile.</b> The merchant\'s totals still stand for display, but an agent must not complete this checkout on its own — escalate to the buyer for review.</p>') : ''}
     ${messagesHtml}
     ${statusNote}
+    ${note('', `<p>Two of those three errors are just missing buyer details, and an agent is expected to
+      supply them. That is the next step.</p>`)}`;
+}
+
+/* ------------------------------------------------------------------ *
+ * Delivery
+ *
+ * The step that turns three red errors into a shippable order. Note the
+ * full-replace rule on line_items: send an empty array and the merchant
+ * empties the checkout, then reports — truthfully — that it cannot ship an
+ * empty order. That error reads exactly like a missing shipping zone and is
+ * nothing of the kind.
+ * ------------------------------------------------------------------ */
+
+async function addDelivery(checkout, product, variant, domain, endpoint) {
+  $('stepDelivery').hidden = false;
+  $('deliveryBody').innerHTML = '<span class="spinner"></span>';
+  try {
+    const { checkout: updated } = await updateCheckout({
+      endpoint,
+      id: checkout.id,
+      lineItems: carryLineItems(checkout, { fallbackVariantId: variant.id }),
+      buyer: { email: 'agent-demo@example.com', phone_number: DEMO_DESTINATION.phone_number },
+      fulfillment: {
+        methods: [{
+          type: 'shipping',
+          line_item_ids: (checkout.lineItems || []).map((li) => li.id).filter(Boolean),
+          destinations: [DEMO_DESTINATION],
+        }],
+      },
+    }, callOpts);
+    renderDelivery(updated, product, variant, domain);
+  } catch (err) {
+    const url = handoffUrl({ continueUrl: checkout.continueUrl, variant, product, domain });
+    $('deliveryBody').innerHTML = errorHtml(err) + (url
+      ? note('', `<p>The checkout still stands. Hand the buyer off:
+          <a href="${esc(url)}" target="_blank" rel="noopener">${esc(url)}</a></p>`)
+      : '');
+  }
+}
+
+function renderDelivery(checkout, product, variant, domain) {
+  const options = deliveryOptions(checkout);
+  const rows = totalsForDisplay(checkout.totals, checkout.currency);
+  const url = handoffUrl({ continueUrl: checkout.continueUrl, variant, product, domain });
+  const ready = checkout.status === 'ready_for_complete';
+
+  /* Name the delivery group only when a basket is split across more than one;
+     for a single group it is noise. */
+  const groupCount = new Set(options.map((o) => o.groupId).filter(Boolean)).size;
+  const optionsHtml = options.length
+    ? `<table class="totals">${options.map((o) => `
+        <tr class="${o.selected ? 'total' : ''}">
+          <td>${o.selected ? '→ ' : ''}${esc(o.title)}${o.description ? ` <span style="color:var(--muted)">· ${esc(o.description)}</span>` : ''}${
+            groupCount > 1 && o.groupId ? ` <span style="color:var(--muted)">group ${esc(String(o.groupId).slice(-6))}</span>` : ''}</td>
+          <td class="amt">${esc(formatMoney(o.amount, checkout.currency))}</td>
+        </tr>`).join('')}</table>`
+    : '<p class="empty">The merchant offered no delivery options for this destination.</p>';
+
+  const totalsHtml = rows.length
+    ? `<table class="totals">${rows.map((r) => `
+        <tr class="${r.type === 'total' ? 'total' : ''}"><td>${esc(r.label)}</td><td class="amt">${esc(r.amount)}</td></tr>
+        ${r.lines.map((l) => `<tr class="sub"><td>${esc(l.label)}</td><td class="amt">${esc(l.amount)}</td></tr>`).join('')}
+      `).join('')}</table>`
+    : '';
+
+  const messagesHtml = (checkout.messages || []).map((m) => {
+    const sev = m.type === 'error' ? (m.severity || 'error') : messageObligation(m);
+    const cls = sev === 'unrecoverable' ? 'disclosure' : sev === 'info' ? 'info' : 'notice';
+    return `<div class="msg ${cls}"><span class="lbl">${esc(sev)}</span>${esc(m.content || m.code || '')}</div>`;
+  }).join('');
+
+  $('deliveryBody').innerHTML = `
+    <dl class="facts">
+      <dt>destination</dt><dd>${esc(DEMO_DESTINATION.address_locality)}, ${esc(DEMO_DESTINATION.address_region)} ${esc(DEMO_DESTINATION.postal_code)}, ${esc(DEMO_DESTINATION.address_country)}</dd>
+      <dt>status</dt><dd>${esc(checkout.status || '—')}</dd>
+      <dt>outstanding errors</dt><dd>${(checkout.messages || []).length || 'none'}</dd>
+    </dl>
+    <p class="hint">
+      A sample civic address and a reserved 555 number — no real buyer details are used, and the
+      merchant quotes rates against a postal code, not an identity.
+    </p>
+    <h3 style="margin:18px 0 6px;font-size:13px">Delivery options offered</h3>
+    ${optionsHtml}
+    ${totalsHtml ? `<h3 style="margin:18px 0 6px;font-size:13px">Totals, with shipping</h3>${totalsHtml}` : ''}
+    ${messagesHtml}
+    ${ready ? note('good', `<p><b>Status <code>ready_for_complete</code>.</b> Every error from the previous step is
+        gone. The merchant has everything it needs; the only thing left is payment.</p>`) : ''}
     ${note('bad', `<p><b>This is where the page stops, and it is an authentication ceiling.</b>
       <code>complete_checkout</code> answers an anonymous agent with
       <code>AuthenticationRequired</code> — it needs a Token-tier JWT from a Shopify Dev Dashboard
@@ -430,11 +522,35 @@ function showError(err) {
   host.innerHTML = errorHtml(err);
 }
 
+/**
+ * A rate limit is the one failure here that is not a bug and not the
+ * merchant's fault, so it gets its own explanation rather than a red box a
+ * visitor would read as "this demo is broken".
+ *
+ * Anonymous agents share one pool, and checkout creation is metered far more
+ * tightly than catalog or cart — `create_cart` keeps answering while
+ * `create_checkout` is refused. It is the clearest argument for the Token tier
+ * this page deliberately cannot reach.
+ */
+function isRateLimit(err) {
+  return /rate limit/i.test(String((err && err.message) || ''));
+}
+
 function errorHtml(err) {
   const code = err instanceof UcpError && err.code ? ` <code>${esc(String(err.code))}</code>` : '';
   const cont = err instanceof UcpError && err.continueUrl
     ? `<p>Hand the buyer off: <a href="${esc(err.continueUrl)}" target="_blank" rel="noopener">${esc(err.continueUrl)}</a></p>`
     : '';
+  if (isRateLimit(err)) {
+    return note('', `<p><b>Rate limited — and this is the protocol working, not the demo breaking.</b></p>
+      <p>Every request on this page is anonymous: no API key, no signature. Shopify meters that tier
+      as one shared pool, and checkout creation far more tightly than catalog or cart — which is why
+      the steps above still answered. A Token-tier agent, identified by a Dev Dashboard credential,
+      gets its own and much higher quota. A static page cannot hold that secret, so it waits its
+      turn like any other anonymous caller.</p>
+      <p class="hint">Try again in a few minutes. The steps above are live and unaffected.</p>
+      ${cont}`);
+  }
   return note('bad', `<p><b>${esc(err.message)}</b>${code}</p>${cont}`);
 }
 

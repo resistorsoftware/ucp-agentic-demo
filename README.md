@@ -19,7 +19,7 @@ response shown verbatim. No server, no API key, no SDK.
 | [`index.html`](index.html) + [`assets/`](assets) | A UCP agent that runs entirely in the browser. Static files on GitHub Pages. |
 | [`ucp/agent-profile.json`](ucp/agent-profile.json) | **This agent's own published UCP profile.** Merchants fetch it during negotiation — served via jsDelivr, for the reason below. |
 | [`src/ucp-client.js`](src/ucp-client.js) | A dependency-free UCP client, shared unchanged by the browser app and the Node scripts. |
-| [`scripts/demo-cycle.mjs`](scripts/demo-cycle.mjs) | The same cycle in a terminal, for demos and CI. |
+| [`scripts/demo-cycle.mjs`](scripts/demo-cycle.mjs) | The same cycle in a terminal, for demos and CI. `--no-checkout` stops at the cart. |
 | [`scripts/audit-catalog.mjs`](scripts/audit-catalog.mjs) | Grades a merchant's catalog on agentic readiness, reading only what an agent reads. |
 | [`scripts/fix-catalog.mjs`](scripts/fix-catalog.mjs) | Applies catalog fixes through the Shopify Admin API (needs a token). |
 | [`scripts/saved-catalog.mjs`](scripts/saved-catalog.mjs) | Searches a Dev Dashboard saved catalog scoped to one store. Credentialed, so CLI-only. |
@@ -165,8 +165,10 @@ index rather than adding to it, so there is nothing to scope. Checked 13 Novembe
 ## Why it stops where it does
 
 Not at the cart — at **completion**. With no credentials of any kind, this store
-answers `search_catalog`, `get_product`, `create_cart` *and* `create_checkout`. The
-demo reaches a real, priced, validated checkout.
+answers `search_catalog`, `get_product`, `create_cart`, `create_checkout` *and*
+`update_checkout`. Give it a destination and the checkout reaches
+`ready_for_complete`, with live shipping options and no outstanding errors: one call
+short of an order.
 
 `complete_checkout` is the one call that refuses:
 
@@ -194,6 +196,7 @@ advertises no payment instrument would prove nothing.
 | `get_product` | ✅ |
 | `create_cart` with real totals | ✅ |
 | `create_checkout` — keyless | ✅ priced, validated, `incomplete` with recoverable errors |
+| `update_checkout` with a destination | ✅ live Canadian rates; reaches `ready_for_complete` |
 | Buyer handoff `continue_url` | ✅ from the checkout |
 | Agent profile published by this repo | ✅ accepted by the merchant |
 | Catalog agentic-readiness | 86%, up from 67% |

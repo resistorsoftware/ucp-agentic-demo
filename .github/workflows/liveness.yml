@@ -17,7 +17,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run the full agentic shopping cycle
+      # Anonymous agents share one rate-limit pool, and checkout creation is
+      # metered far tighter than catalog or cart. Pushes prove the merchant is
+      # answering without spending the quota the public demo page needs; the
+      # daily run exercises checkout and delivery as well.
+      - name: Run the cycle (push — stops at the cart)
+        if: github.event_name == 'push'
+        run: node scripts/demo-cycle.mjs --query "floral grass" --no-checkout
+      - name: Run the full cycle (scheduled or manual)
+        if: github.event_name != 'push'
         run: node scripts/demo-cycle.mjs --query "floral grass"
       - name: Audit catalog readiness
         run: node scripts/audit-catalog.mjs

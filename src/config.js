@@ -28,3 +28,22 @@ export const DEFAULT_CONTEXT = {
   currency: 'CAD',
   language: 'en-CA',
 };
+
+/**
+ * A sample delivery destination, used only to ask the merchant for shipping
+ * options. Deliberately a public civic address and a reserved 555 phone
+ * number: no real person's details belong in a public demo, and none are
+ * needed — the merchant quotes rates against a postal code, not an identity.
+ *
+ * Nothing is ever ordered, so nothing is ever delivered here.
+ */
+export const DEMO_DESTINATION = {
+  first_name: 'Agent',
+  last_name: 'Demo',
+  phone_number: '+14165550123',
+  street_address: '100 Queen St W',
+  address_locality: 'Toronto',
+  address_region: 'ON',
+  postal_code: 'M5H 2N2',
+  address_country: 'CA',
+};

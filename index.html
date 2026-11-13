@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>UCP agentic shopping demo — hotwire-resistor</title>
 <meta name="description" content="A browser-based Universal Commerce Protocol agent: discovers a Shopify merchant, searches the global and storefront catalogs, and builds a real cart.">
-<link rel="stylesheet" href="assets/styles.css?v=4">
+<link rel="stylesheet" href="assets/styles.css?v=5">
 </head>
 <body>
 <div class="wrap">
@@ -17,7 +17,7 @@
       This page is a Universal Commerce Protocol agent. It runs entirely in your browser:
       no server, no API key. It reads a merchant's published UCP profile, negotiates a version,
       searches both Shopify's cross-merchant global catalog and the merchant's own storefront
-      catalog, assembles a real cart, and converts it into a real, merchant-priced checkout. Every request is shown verbatim
+      catalog, assembles a real cart, converts it into a checkout, and collects live shipping rates. Every request is shown verbatim
       in the protocol log at the bottom.
     </p>
     <div class="identity">
@@ -39,9 +39,10 @@
     <button id="reset" class="ghost">Reset</button>
   </div>
   <p class="hint">
-    The cycle runs to a real, priced checkout and stops there — <code>complete_checkout</code> is the one
-    call that needs a credential this page deliberately does not hold. Nothing is purchased, and no card
-    details are ever collected here.
+    The cycle runs to <code>ready_for_complete</code> — a real checkout, with real shipping options, one
+    call short of an order. That last call, <code>complete_checkout</code>, is the only one needing a
+    credential this page deliberately does not hold. Nothing is purchased, and no card details are ever
+    collected here.
   </p>
 
   <section class="step" id="stepDiscover" hidden>
@@ -77,8 +78,13 @@
     <div class="body" id="checkoutBody"></div>
   </section>
 
+  <section class="step" id="stepDelivery" hidden>
+    <h2><span class="n">5</span> Delivery <span class="tool">update_checkout</span></h2>
+    <div class="body" id="deliveryBody"></div>
+  </section>
+
   <section class="step log" id="stepLog" hidden>
-    <h2><span class="n">5</span> Protocol log <span class="tool">JSON-RPC 2.0 over the MCP binding</span></h2>
+    <h2><span class="n">6</span> Protocol log <span class="tool">JSON-RPC 2.0 over the MCP binding</span></h2>
     <div class="body" id="logBody"></div>
   </section>
 
@@ -99,6 +105,6 @@
 <!-- GitHub Pages serves assets with Cache-Control: max-age=600, so a visitor
      can hold a stale bundle for ten minutes after a deploy. Bump ?v= when the
      app or stylesheet changes and the new version is fetched immediately. -->
-<script type="module" src="assets/app.js?v=4"></script>
+<script type="module" src="assets/app.js?v=5"></script>
 </body>
 </html>
