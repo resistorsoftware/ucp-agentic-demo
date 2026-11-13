@@ -53,19 +53,22 @@ seller — real cross-merchant behaviour, just not with this store as the seller
    channel is enabled and that products are published to it. Only 9 products are
    currently visible to agents — if the store holds more, the rest are unpublished to
    this channel.
-2. **Development-store eligibility.** *Needs confirming.* Shopify's docs say the
+2. **Development-store eligibility.** *Partly answered.* Shopify's docs say the
    global catalog returns products from "any eligible merchant" without defining
    eligible. Development stores cannot process real payments, which is consistent
-   with what this store advertises (see Gap 2) and is the most likely reason it is
-   absent. Confirm with Shopify whether a dev store can ever be listed.
+   with what this store advertises (see Gap 2). But the Dev Dashboard's store picker
+   does list at least one plainly-generated dev-store domain, so dev stores are not
+   categorically excluded — this store specifically has not been indexed.
 3. **Product eligibility.** Products with no price, no category and no image are
    routinely excluded. Four of the nine products here are priced at zero and four have
    no category — see [`catalog-audit.md`](catalog-audit.md).
-4. **A saved catalog, as a deterministic alternative.** In the Shopify Dev Dashboard
-   you can save a catalog configuration scoped to a single store and get a custom
-   catalog URL for it. That makes "agentic search finds my store" reproducible for a
-   demo without waiting on global-catalog eligibility. This is the recommended next
-   step if the store stays out of the global index.
+4. **A saved catalog — tried, and ruled out.** The Dev Dashboard lets you save a
+   catalog configuration scoped to specific stores. Checked 13 November 2026: the
+   **Specific stores** picker searches stores already in the catalog index, and
+   `hotwire-resistor` returns *No matching stores*. A saved catalog narrows that
+   index rather than adding to it, so there is nothing to scope. Full write-up in
+   [`saved-catalog.md`](saved-catalog.md). The tooling is kept for the day the store
+   is indexed.
 
 ---
 
@@ -179,8 +182,10 @@ attached, option names real (`Resistance`, not `Title`).
 5. Confirm the agentic sales channel is publishing everything you intend — six
    products are visible to agents; if the store holds more, the rest are unpublished
    to that channel.
-6. Decide between waiting on global-catalog eligibility and shipping a saved catalog
-   scoped to this store.
+6. ~~Decide between waiting on global-catalog eligibility and shipping a saved
+   catalog scoped to this store.~~ The saved catalog is not available — the store is
+   not in the index the picker searches. Global-index eligibility is the only route,
+   and steps 3–5 are what make the store a plausible candidate for it.
 
 ---
 

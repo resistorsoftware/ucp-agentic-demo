@@ -23,7 +23,7 @@ response shown verbatim. No server, no API key, no SDK.
 | [`scripts/audit-catalog.mjs`](scripts/audit-catalog.mjs) | Grades a merchant's catalog on agentic readiness, reading only what an agent reads. |
 | [`scripts/fix-catalog.mjs`](scripts/fix-catalog.mjs) | Applies catalog fixes through the Shopify Admin API (needs a token). |
 | [`scripts/saved-catalog.mjs`](scripts/saved-catalog.mjs) | Searches a Dev Dashboard saved catalog scoped to one store. Credentialed, so CLI-only. |
-| [`docs/saved-catalog.md`](docs/saved-catalog.md) | Why that path is credentialed, and how to set it up. |
+| [`docs/saved-catalog.md`](docs/saved-catalog.md) | Why that path is credentialed, and why it is blocked for this store. |
 | [`docs/store-readiness.md`](docs/store-readiness.md) | The merchant side: what is live, what is not, and what to change in Shopify admin. |
 | [`docs/catalog-audit.md`](docs/catalog-audit.md) | Current audit output for `hotwire-resistor`. |
 
@@ -155,6 +155,12 @@ A client secret in a static site is a public secret, so that path lives in
 [`scripts/saved-catalog.mjs`](scripts/saved-catalog.mjs) and never in the published
 page. `getAccessToken()` refuses to run in a browser at all.
 
+That path is also, for now, a dead end for this store: the Dev Dashboard's **Specific
+stores** picker is a search over stores already in the catalog index, and
+`hotwire-resistor.myshopify.com` is not among them. A saved catalog narrows the global
+index rather than adding to it, so there is nothing to scope. Checked 13 November
+2026; the details are in [`docs/saved-catalog.md`](docs/saved-catalog.md).
+
 ## Why it stops at the cart
 
 `hotwire-resistor.myshopify.com` publishes an empty `payment_handlers` object, so it
@@ -176,7 +182,7 @@ demo to stop: everything up to the cart is verifiable without moving money.
 | Agent profile published by this repo | ✅ accepted by the merchant |
 | Catalog agentic-readiness | 86%, up from 67% |
 | Global (cross-merchant) catalog search | ✅ works; **does not return this store** |
-| Saved catalog scoped to this store | ⏳ set up in the Dev Dashboard — [`docs/saved-catalog.md`](docs/saved-catalog.md) |
+| Saved catalog scoped to this store | ⛔ the store is not selectable in the Dev Dashboard source picker — [`docs/saved-catalog.md`](docs/saved-catalog.md) |
 | Agent-completed checkout | ⛔ no payment handler advertised |
 
 The two gaps are merchant-side, not protocol-side. Both are explained, with what to
