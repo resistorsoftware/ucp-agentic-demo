@@ -149,7 +149,7 @@ export async function callTool(
   endpoint,
   toolName,
   args,
-  { agentProfile, fetchImpl = fetch, onExchange, signal, corsSimple = IS_BROWSER, accessToken } = {},
+  { agentProfile, fetchImpl = fetch, onExchange, signal, corsSimple = IS_BROWSER, accessToken, extraHeaders } = {},
 ) {
   if (!endpoint) throw new UcpError('No MCP endpoint', { code: 'NO_ENDPOINT' });
   if (!agentProfile) throw new UcpError('No agent profile URL', { code: 'PROFILE_NOT_FOUND' });
@@ -171,10 +171,12 @@ export async function callTool(
     method: 'POST',
     headers: {
       ...corsSimpleHeaders(corsSimple && !accessToken),
-      /* A saved catalog is credentialed, and an Authorization header always
-         triggers a CORS preflight — which is one more reason a saved catalog
-         belongs in a server or a CLI, never in a public static page. */
+      /* An Authorization header always triggers a CORS preflight, and
+         catalog.shopify.com answers preflight with HTTP 400 — so a
+         credentialed call cannot be made from a browser at all. Token-tier
+         work belongs in a CLI or a server regardless of secret handling. */
       ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+      ...(extraHeaders || {}),
     },
     body: JSON.stringify(request),
     signal,
@@ -304,6 +306,86 @@ function normalizeCart(payload) {
     fulfillment: c.fulfillment || null,
     continueUrl: c.continue_url || null,
     raw: c,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Checkout
+ *
+ * Verified against hotwire-resistor.myshopify.com on 13 November 2026:
+ * `create_checkout` and `update_checkout` answer an ANONYMOUS agent — no API
+ * key, no request signature. `complete_checkout` does not; it returns
+ * `AuthenticationRequired` ("a valid JWT is required") before it ever looks at
+ * whether the merchant advertises a payment handler.
+ *
+ * So the ceiling on a keyless agent is completion, not checkout. A demo can
+ * legitimately go all the way to a priced, validated checkout and hand the
+ * buyer off — which is a much better demo than stopping at the cart.
+ * ------------------------------------------------------------------ */
+
+/** `create_checkout` — convert a cart into a checkout. Keyless. */
+export async function createCheckout({ endpoint, cartId, lineItems, context, buyer }, options = {}) {
+  /* Converting a cart sends an empty line_items; it is the cart_id that
+     carries the contents. Only a true buy-now flow passes line_items. */
+  const checkout = cartId ? { cart_id: cartId, line_items: lineItems || [] } : { line_items: lineItems };
+  if (context) checkout.context = context;
+  if (buyer) checkout.buyer = buyer;
+  const { payload, exchange } = await callTool(endpoint, 'create_checkout', { checkout }, options);
+  return { checkout: normalizeCheckout(payload), exchange };
+}
+
+/** `update_checkout` — full replace on `line_items`, same rule as the cart. */
+export async function updateCheckout({ endpoint, id, lineItems, buyer, fulfillment }, options = {}) {
+  const checkout = { id, line_items: lineItems || [] };
+  if (buyer) checkout.buyer = buyer;
+  if (fulfillment) checkout.fulfillment = fulfillment;
+  const { payload, exchange } = await callTool(endpoint, 'update_checkout', { checkout }, options);
+  return { checkout: normalizeCheckout(payload), exchange };
+}
+
+/**
+ * `complete_checkout` — the only operation here that needs a credential.
+ *
+ * Requires Token-tier auth: a JWT from a Dev Dashboard agent identity, plus a
+ * `Shopify-Buyer-IP` header carrying the real IP of the buyer you act for.
+ * Shopify will not fall back to the connecting address, and sends HTTP 422 if
+ * the header is missing. There is no placeholder value.
+ */
+export async function completeCheckout({ endpoint, id, buyerIp }, options = {}) {
+  if (!options.accessToken) {
+    throw new UcpError(
+      'complete_checkout needs a Token-tier JWT. Anonymous and signed agents cannot complete a purchase.',
+      { code: 'AUTH_REQUIRED' },
+    );
+  }
+  if (!buyerIp) {
+    throw new UcpError(
+      'complete_checkout needs a Shopify-Buyer-IP header with the real buyer IP. Shopify rejects the call without it.',
+      { code: 'BUYER_IP_REQUIRED' },
+    );
+  }
+  const { payload, exchange } = await callTool(
+    endpoint,
+    'complete_checkout',
+    { checkout: { id } },
+    { ...options, extraHeaders: { 'shopify-buyer-ip': buyerIp } },
+  );
+  return { checkout: normalizeCheckout(payload), exchange };
+}
+
+function normalizeCheckout(payload) {
+  const k = (payload && (payload.checkout || payload)) || {};
+  return {
+    id: k.id || null,
+    status: k.status || null,
+    currency: k.currency || null,
+    lineItems: k.line_items || [],
+    totals: k.totals || [],
+    messages: (payload && payload.messages) || k.messages || [],
+    fulfillment: k.fulfillment || null,
+    payment: k.payment || null,
+    continueUrl: k.continue_url || null,
+    raw: k,
   };
 }
 

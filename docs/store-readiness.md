@@ -74,13 +74,18 @@ seller — real cross-merchant behaviour, just not with this store as the seller
 
 ## Gap 2 — no agent-completable payment
 
-The store's profile publishes `"payment_handlers": {}` — an empty object. No payment
-handler means no method an agent can settle on its own, so `complete_checkout` returns
-`requires_escalation` and the buyer finishes at the store's own checkout via
-`continue_url`.
+The store's profile publishes `"payment_handlers": {}` — an empty object, and
+`create_checkout` confirms it with `payment.instruments: []`. No payment handler means
+no method an agent can settle on its own, so a completed checkout would escalate to
+`continue_url` and the buyer would finish at the store's own checkout.
 
-This is a **valid UCP lifecycle outcome, not an error**, and the demo treats it as
-one. To close it, the store needs an active payment provider that supports agentic
+**This is not, however, what currently blocks the demo.** An anonymous agent is
+refused at `complete_checkout` with `AuthenticationRequired` — a Token-tier JWT is
+required — before the merchant's payment configuration is ever consulted. Closing this
+gap alone would change nothing. See [`checkout.md`](checkout.md).
+
+Escalation is a **valid UCP lifecycle outcome, not an error**, and the demo treats it
+as one. To close it, the store needs an active payment provider that supports agentic
 checkout — which a development store cannot have. On a production store, enable
 Shopify Payments and the agentic checkout terms, then re-run
 `node scripts/demo-cycle.mjs` and watch `payment_handlers` fill in.

@@ -6,10 +6,12 @@
  *   2. Search      — cross-merchant (global catalog) and merchant-scoped
  *   3. Select      — get_product for the live option matrix
  *   4. Cart        — create_cart, then render totals under the printer contract
- *   5. Handoff     — the continue_url a buyer or a checkout step would follow
+ *   5. Checkout    — create_checkout, priced and validated. Still keyless.
+ *   6. Handoff     — the continue_url the buyer follows to finish
  *
- * No money moves: this script stops at the cart. Checkout completion is a
- * separate, deliberate step (see docs/checkout.md).
+ * No money moves. The cycle stops one operation short of `complete_checkout`,
+ * which is the only call here that requires a credential — see docs/checkout.md
+ * for why, and for what a Dev Dashboard agent identity would change.
  *
  * Usage:
  *   node scripts/demo-cycle.mjs [--query "<term>"] [--store <domain>] [--json]
@@ -18,6 +20,7 @@ import {
   GLOBAL_CATALOG_ENDPOINT,
   UcpError,
   createCart,
+  createCheckout,
   descriptionText,
   discoverBusiness,
   formatMoney,
@@ -41,6 +44,8 @@ const asJson = Boolean(args.json);
 const transcript = { store, agentProfile: profile, query, steps: [] };
 
 const record = (name, data) => transcript.steps.push({ step: name, ...data });
+/* --json is meant to be piped, so nothing human-readable may reach stdout. */
+const say = (...a) => { if (!asJson) step(...a); };
 
 async function main() {
   if (!asJson) {
@@ -59,7 +64,7 @@ async function main() {
   record('agent-profile', { url: profile, ucpVersion: reach.version });
 
   /* ---- 1. Discovery ---- */
-  step(1, 'Discovery — GET /.well-known/ucp');
+  say(1, 'Discovery — GET /.well-known/ucp');
   const biz = await discoverBusiness(store);
   if (!asJson) {
     kv('UCP version', biz.version);
@@ -80,7 +85,7 @@ async function main() {
   if (!biz.endpoint) fail('Merchant advertises no MCP endpoint.');
 
   /* ---- 2a. Cross-merchant search ---- */
-  step('2a', 'Global catalog search — all of Shopify');
+  say('2a', 'Global catalog search — all of Shopify');
   const global = await searchCatalog(
     { endpoint: GLOBAL_CATALOG_ENDPOINT, query, context, limit: 10 },
     { agentProfile: profile },
@@ -111,7 +116,7 @@ async function main() {
   });
 
   /* ---- 2b. Merchant-scoped search ---- */
-  step('2b', `Storefront catalog search — ${store} only`);
+  say('2b', `Storefront catalog search — ${store} only`);
   const local = await searchCatalog(
     { endpoint: biz.endpoint, query, context, limit: 10 },
     { agentProfile: profile },
@@ -128,7 +133,7 @@ async function main() {
   if (!local.products.length) fail(`No products matched "${query}" at ${store}.`);
 
   /* ---- 3. Selection ---- */
-  step(3, 'Selection — get_product for the live option matrix');
+  say(3, 'Selection — get_product for the live option matrix');
   const chosen = local.products[0];
   const detail = await getProduct({ endpoint: biz.endpoint, id: chosen.id }, { agentProfile: profile });
   const product = detail.product || chosen;
@@ -154,7 +159,7 @@ async function main() {
   record('selection', { productId: product.id, title: product.title, variantId: variant.id });
 
   /* ---- 4. Cart ---- */
-  step(4, 'Cart — create_cart');
+  say(4, 'Cart — create_cart');
   const { cart } = await createCart(
     { endpoint: biz.endpoint, lineItems: [{ item: { id: variant.id }, quantity: 1 }], context },
     { agentProfile: profile },
@@ -185,14 +190,92 @@ async function main() {
     reconcile: totalsReconcile(cart.totals),
   });
 
-  /* ---- 5. Handoff ---- */
-  step(5, 'Handoff — where a buyer finishes');
-  const url = handoffUrl({ continueUrl: cart.continueUrl, variant, product, domain: store });
+  /* ---- 5. Checkout ----
+   *
+   * Keyless. `create_checkout` answers an anonymous agent; only
+   * `complete_checkout` demands a JWT. So the honest ceiling for a demo with
+   * no credentials is a fully priced, validated checkout — not the cart.
+   */
+  say(5, 'Checkout — create_checkout (still no credentials)');
+  let checkout = null;
+  try {
+    ({ checkout } = await createCheckout(
+      { endpoint: biz.endpoint, cartId: cart.id, context },
+      { agentProfile: profile },
+    ));
+  } catch (err) {
+    if (!(err instanceof UcpError)) throw err;
+    if (!asJson) kv('create_checkout', c.yellow(`refused — ${err.code || ''} ${err.message}`));
+    record('checkout', { ok: false, code: err.code, message: err.message });
+  }
+
+  if (checkout) {
+    if (!asJson) {
+      kv('checkout id', checkout.id);
+      kv('status', checkout.status === 'incomplete'
+        ? `${checkout.status} ${c.dim('(buyer details still missing — expected)')}`
+        : checkout.status);
+      const instruments = checkout.payment?.instruments || [];
+      kv('payment instruments', instruments.length
+        ? instruments.map((i) => i.type || i.id).join(', ')
+        : c.yellow('none offered'));
+      console.log(`\n    ${c.bold('Totals')} ${c.dim('(merchant order, merchant labels)')}`);
+      for (const row of totalsForDisplay(checkout.totals, checkout.currency)) {
+        console.log(`      ${row.label.padEnd(24)} ${row.amount.padStart(12)}`);
+        row.lines.forEach((l) => console.log(`        ${c.dim(l.label.padEnd(22))} ${c.dim(l.amount.padStart(12))}`));
+      }
+      /* The merchant's errors ARE the demo here: they are what an agent must
+         resolve, or hand off for, rather than paper over. */
+      if (checkout.messages.length) {
+        console.log(`\n    ${c.bold('Merchant messages')} ${c.dim('(what still blocks this checkout)')}`);
+      }
+      for (const m of checkout.messages) {
+        const ob = messageObligation(m);
+        const tag = m.type === 'error'
+          ? (m.severity === 'unrecoverable' ? c.red('[blocking]') : c.yellow(`[${m.severity || 'error'}]`))
+          : ob === 'disclosure' ? c.red('[MUST SHOW]') : ob === 'notice' ? c.yellow('[show]') : c.dim('[info]');
+        console.log(`      ${tag} ${m.content || m.code}`);
+      }
+    }
+    record('checkout', {
+      ok: true,
+      id: checkout.id,
+      status: checkout.status,
+      totals: checkout.totals,
+      messages: checkout.messages,
+      paymentInstruments: checkout.payment?.instruments || [],
+    });
+  }
+
+  /* ---- 5b. The wall ----
+   *
+   * Stated rather than attempted. `complete_checkout` on this endpoint returns
+   * AuthenticationRequired for an anonymous agent — it is an auth ceiling, not
+   * the missing payment handler the cart step hints at.
+   */
+  if (!asJson) {
+    step('5b', 'Completion — the one call that needs a credential');
+    kv('complete_checkout', c.yellow('not attempted — requires a Token-tier JWT'));
+    kv('why', c.dim('a Dev Dashboard agent identity, plus a Shopify-Buyer-IP header'));
+    kv('and then', c.dim('this merchant advertises no payment instrument, so it would still escalate'));
+  }
+  record('completion', {
+    attempted: false,
+    requires: ['token-tier JWT from a Dev Dashboard agent identity', 'Shopify-Buyer-IP header'],
+    note: 'Anonymous agents are refused with AuthenticationRequired before payment handlers are considered.',
+  });
+
+  /* ---- 6. Handoff ---- */
+  say(6, 'Handoff — where a buyer finishes');
+  const url = handoffUrl({
+    continueUrl: checkout?.continueUrl || cart.continueUrl, variant, product, domain: store,
+  });
   if (!asJson) {
     kv('continue_url', url || '—');
-    console.log(`\n${c.green(c.bold('Cycle complete.'))} ${c.dim('Discovery → search → selection → cart → handoff. No order was placed.')}\n`);
+    kv('source', checkout?.continueUrl ? 'checkout' : 'cart');
+    console.log(`\n${c.green(c.bold('Cycle complete.'))} ${c.dim('Discovery → search → selection → cart → checkout → handoff. No order was placed.')}\n`);
   }
-  record('handoff', { continueUrl: url });
+  record('handoff', { continueUrl: url, from: checkout?.continueUrl ? 'checkout' : 'cart' });
 
   if (asJson) console.log(JSON.stringify(transcript, null, 2));
 }

@@ -42,32 +42,29 @@ Two things are worth noting, because they narrow the diagnosis:
 
 Nothing was created or saved during this check; the draft was discarded.
 
-## The constraint that shapes the whole design
+## Correction: a saved catalog is *not* credentialed
 
-The global and storefront catalogs are **keyless** — identity comes from the agent
-profile alone, which is why the published demo page can call them from a browser with
-no server.
-
-A saved catalog is **credentialed**. You exchange a Dev Dashboard client id and secret
-for a 60-minute bearer token:
+This file previously said a saved catalog required a client id and secret. **It does
+not.** Tested 13 November 2026 against a real saved catalog:
 
 ```
-POST https://api.shopify.com/auth/access_token
-{ "client_id": "…", "client_secret": "…", "grant_type": "client_credentials" }
+POST https://catalog.shopify.com/api/ucp/mcp
+{ "catalog": { "query": "snowboard", "catalog_id": "01m7ay…me3mq6" } }
 ```
 
-A client secret in a static site is a public secret, so **the saved catalog path is a
-CLI script, never part of the published page**. That is a deliberate boundary:
+with no `Authorization` header at all — same three products as the unscoped global
+search, no auth error. `catalog_id` is a configuration identifier, not a credential.
 
-| Surface | Catalogs | Credentials |
-| --- | --- | --- |
-| Published page (GitHub Pages) | global + storefront | none — keyless |
-| `scripts/saved-catalog.mjs` (local) | saved catalog | client id + secret, from `.env.local` |
+So a saved catalog *could* live in the published static page. A Dev Dashboard token
+buys you rate limit (5 req/s per client, versus a shared per-IP pool for anonymous
+traffic), not access. See [`checkout.md`](checkout.md) for the three identification
+tiers and what each one actually unlocks.
 
-`getAccessToken()` in `src/ucp-client.js` throws `UNSAFE_CONTEXT` rather than run in a
-browser at all. If you ever want the saved catalog behind the public demo, it needs a
-small server or Worker holding the secret and proxying the call. Nothing in this repo
-does that today.
+`scripts/saved-catalog.mjs` still supports the credentialed path, because the token
+tier is real and worth having — it just isn't a precondition for saved catalogs.
+`getAccessToken()` continues to refuse to run in a browser, which stays correct: a
+client secret in a static site is a public secret, and an `Authorization` header forces
+a CORS preflight that `catalog.shopify.com` answers with HTTP 400.
 
 ## If the store does get indexed
 
@@ -83,8 +80,9 @@ nothing:
 4. Use **Search preview** with `floral` or `insurance` to confirm the products this
    repo rewrote come back.
 5. **Save**, then copy the catalog's **URL** and **id**.
-6. **Agent identities → New identity** gives the client ID and secret. The scope you
-   want is `read_global_api_catalog_search`.
+6. Optional: **Agent identities → New identity** gives a client ID and secret for the
+   token tier — higher rate limits, and the only route to `complete_checkout`. Not
+   needed just to search the catalog.
 
 Then:
 

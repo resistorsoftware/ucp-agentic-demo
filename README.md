@@ -24,6 +24,7 @@ response shown verbatim. No server, no API key, no SDK.
 | [`scripts/fix-catalog.mjs`](scripts/fix-catalog.mjs) | Applies catalog fixes through the Shopify Admin API (needs a token). |
 | [`scripts/saved-catalog.mjs`](scripts/saved-catalog.mjs) | Searches a Dev Dashboard saved catalog scoped to one store. Credentialed, so CLI-only. |
 | [`docs/saved-catalog.md`](docs/saved-catalog.md) | Why that path is credentialed, and why it is blocked for this store. |
+| [`docs/checkout.md`](docs/checkout.md) | The three agent identification tiers, and which call each one unlocks. |
 | [`docs/store-readiness.md`](docs/store-readiness.md) | The merchant side: what is live, what is not, and what to change in Shopify admin. |
 | [`docs/catalog-audit.md`](docs/catalog-audit.md) | Current audit output for `hotwire-resistor`. |
 
@@ -161,13 +162,27 @@ stores** picker is a search over stores already in the catalog index, and
 index rather than adding to it, so there is nothing to scope. Checked 13 November
 2026; the details are in [`docs/saved-catalog.md`](docs/saved-catalog.md).
 
-## Why it stops at the cart
+## Why it stops where it does
 
-`hotwire-resistor.myshopify.com` publishes an empty `payment_handlers` object, so it
-advertises no agent-completable payment method. `complete_checkout` would return
-`requires_escalation` and the buyer would finish at the merchant's own checkout.
-That is a correct UCP outcome rather than a failure, and it is the honest place for a
-demo to stop: everything up to the cart is verifiable without moving money.
+Not at the cart — at **completion**. With no credentials of any kind, this store
+answers `search_catalog`, `get_product`, `create_cart` *and* `create_checkout`. The
+demo reaches a real, priced, validated checkout.
+
+`complete_checkout` is the one call that refuses:
+
+```
+AuthenticationRequired — a valid JWT is required to call complete_checkout
+```
+
+That refusal happens at the authentication layer, before the merchant's payment
+configuration is consulted. The store's empty `payment_handlers` is a second, separate
+blocker behind it — real, but never reached by an anonymous agent. Both are explained,
+with the three identification tiers and what each unlocks, in
+[`docs/checkout.md`](docs/checkout.md).
+
+Stopping there is the honest place for a demo: everything up to completion is
+verifiable without moving money, and completing a purchase on a development store that
+advertises no payment instrument would prove nothing.
 
 ## Status, verified live
 
@@ -178,12 +193,13 @@ demo to stop: everything up to the cart is verifiable without moving money.
 | Storefront catalog search | ✅ 6 products exposed to agents |
 | `get_product` | ✅ |
 | `create_cart` with real totals | ✅ |
-| Buyer handoff `continue_url` | ✅ |
+| `create_checkout` — keyless | ✅ priced, validated, `incomplete` with recoverable errors |
+| Buyer handoff `continue_url` | ✅ from the checkout |
 | Agent profile published by this repo | ✅ accepted by the merchant |
 | Catalog agentic-readiness | 86%, up from 67% |
 | Global (cross-merchant) catalog search | ✅ works; **does not return this store** |
 | Saved catalog scoped to this store | ⛔ the store is not selectable in the Dev Dashboard source picker — [`docs/saved-catalog.md`](docs/saved-catalog.md) |
-| Agent-completed checkout | ⛔ no payment handler advertised |
+| Agent-completed checkout | ⛔ needs a Token-tier JWT first; no payment instrument behind that |
 
 The two gaps are merchant-side, not protocol-side. Both are explained, with what to
 change, in [`docs/store-readiness.md`](docs/store-readiness.md).
