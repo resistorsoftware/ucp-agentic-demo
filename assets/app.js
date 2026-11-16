@@ -22,8 +22,13 @@ import {
   totalsForDisplay,
   totalsReconcile,
   updateCheckout,
-} from '../src/ucp-client.js?v=5';
-import { DEFAULT_CONTEXT, DEMO_DESTINATION, PUBLISHED_AGENT_PROFILE } from '../src/config.js?v=5';
+} from '../src/ucp-client.js?v=6';
+import {
+  CANADIAN_ORIGIN_FILTERS,
+  DEFAULT_CONTEXT,
+  DEMO_DESTINATION,
+  PUBLISHED_AGENT_PROFILE,
+} from '../src/config.js?v=6';
 
 const $ = (id) => document.getElementById(id);
 const exchanges = [];
@@ -100,8 +105,14 @@ async function run() {
     $('storeResults').innerHTML = '<span class="spinner"></span>';
 
     const context = { ...DEFAULT_CONTEXT, intent: query };
+    /* Origin and destination filters exist only on the global catalog. The
+       storefront endpoint advertises categories, price and available — nothing
+       geographic — so the merchant-scoped search sends context alone. */
     const [globalRes, storeRes] = await Promise.allSettled([
-      searchCatalog({ endpoint: GLOBAL_CATALOG_ENDPOINT, query, context, limit: 8 }, callOpts),
+      searchCatalog(
+        { endpoint: GLOBAL_CATALOG_ENDPOINT, query, context, filters: CANADIAN_ORIGIN_FILTERS, limit: 8 },
+        callOpts,
+      ),
       searchCatalog({ endpoint: biz.endpoint, query, context, limit: 8 }, callOpts),
     ]);
 

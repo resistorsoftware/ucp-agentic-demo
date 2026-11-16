@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>UCP agentic shopping demo — hotwire-resistor</title>
 <meta name="description" content="A browser-based Universal Commerce Protocol agent: discovers a Shopify merchant, searches the global and storefront catalogs, and builds a real cart.">
-<link rel="stylesheet" href="assets/styles.css?v=5">
+<link rel="stylesheet" href="assets/styles.css?v=6">
 </head>
 <body>
 <div class="wrap">
@@ -57,14 +57,29 @@
         <div class="col">
           <h3>Global catalog — all of Shopify</h3>
           <p class="sub">catalog.shopify.com/api/ucp/mcp</p>
+          <p class="sub">ships_to CA/QC/H3B&nbsp;1A1 · ships_from CA</p>
           <div id="globalResults"></div>
         </div>
         <div class="col">
           <h3>Storefront catalog — this merchant only</h3>
           <p class="sub" id="storeEndpointLabel">—</p>
+          <p class="sub">no geographic filter — not offered here</p>
           <div id="storeResults"></div>
         </div>
       </div>
+      <p class="sub">
+        The buyer is in Montreal, and the request says so as precisely as the
+        protocol allows: <code>address_region</code>&nbsp;QC and
+        <code>postal_code</code>&nbsp;H3B&nbsp;1A1. Measured against the live
+        catalog, neither changes the results — a search from Quebec and the same
+        search from British Columbia return identical products in identical
+        order, while one Quebec search run twice does not. The country selects
+        the currency and shifts the merchant mix; <code>ships_from</code> is the
+        only geographic narrowing on offer, and its finest grain is the country.
+        Proximity exists in UCP, but as a separate per-merchant capability for
+        finding retail stores — not as a way to rank a catalog.
+        <a href="docs/location.md">How this was measured</a>.
+      </p>
     </div>
   </section>
 
@@ -105,6 +120,6 @@
 <!-- GitHub Pages serves assets with Cache-Control: max-age=600, so a visitor
      can hold a stale bundle for ten minutes after a deploy. Bump ?v= when the
      app or stylesheet changes and the new version is fetched immediately. -->
-<script type="module" src="assets/app.js?v=5"></script>
+<script type="module" src="assets/app.js?v=6"></script>
 </body>
 </html>

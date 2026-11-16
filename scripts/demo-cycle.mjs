@@ -16,7 +16,8 @@
  *
  * Usage:
  *   node scripts/demo-cycle.mjs [--query "<term>"] [--store <domain>] [--json]
- *                               [--no-checkout]   stop after the cart
+ *                               [--no-checkout]       stop after the cart
+ *                               [--no-origin-filter]  drop ships_from: CA
  */
 import {
   GLOBAL_CATALOG_ENDPOINT,
@@ -38,7 +39,7 @@ import {
   totalsReconcile,
   updateCheckout,
 } from '../src/ucp-client.js';
-import { DEMO_DESTINATION } from '../src/config.js';
+import { CANADIAN_ORIGIN_FILTERS, DEMO_DESTINATION } from '../src/config.js';
 import { agentProfile, assertProfileReachable, buyerContext, c, kv, step, storeDomain } from '../src/node-env.js';
 
 const args = parseArgs(process.argv.slice(2));
@@ -51,6 +52,11 @@ const asJson = Boolean(args.json);
    anonymous agents. CI runs on every push and daily; left unchecked it would
    spend the shared quota that real visitors to the demo page need. */
 const skipCheckout = Boolean(args['no-checkout']);
+/* Origin filtering is the only geographic narrowing the protocol offers, and
+   it is country-granular. Dropping it is the clearest way to see what it does:
+   the same query without it returns a different, more US-weighted merchant
+   mix. See docs/location.md. */
+const originFilters = args['no-origin-filter'] ? null : CANADIAN_ORIGIN_FILTERS;
 const transcript = { store, agentProfile: profile, query, steps: [] };
 
 const record = (name, data) => transcript.steps.push({ step: name, ...data });
@@ -97,9 +103,19 @@ async function main() {
   /* ---- 2a. Cross-merchant search ---- */
   say('2a', 'Global catalog search — all of Shopify');
   const global = await searchCatalog(
-    { endpoint: GLOBAL_CATALOG_ENDPOINT, query, context, limit: 10 },
+    { endpoint: GLOBAL_CATALOG_ENDPOINT, query, context, filters: originFilters, limit: 10 },
     { agentProfile: profile },
   );
+  if (!asJson) {
+    kv('ships_to', originFilters
+      ? `${context.address_country} / ${context.address_region} / ${context.postal_code}`
+      + c.dim('  (region and postal code do not affect ranking)')
+      : c.dim('not filtered — --no-origin-filter'));
+    kv('ships_from', originFilters
+      ? `${originFilters.ships_from.map((o) => o.country).join(', ')}`
+      + c.dim('  (country is the finest granularity available)')
+      : c.dim('not filtered — compare this merchant mix with a filtered run'));
+  }
   const sellers = new Map();
   for (const p of global.products) {
     const d = safeSellerDomain(((p.variants || [])[0] || {}).seller?.domain);
@@ -120,6 +136,8 @@ async function main() {
   }
   record('global-search', {
     endpoint: GLOBAL_CATALOG_ENDPOINT,
+    context,
+    filters: originFilters,
     results: global.products.length,
     sellers: [...sellers.keys()],
     storePresent: storeInGlobal,
@@ -133,6 +151,10 @@ async function main() {
   );
   if (!asJson) {
     kv('results', String(local.products.length));
+    /* Not an omission: the storefront endpoint advertises only categories,
+       price and available. Origin and destination filters are a global-catalog
+       feature, so sending them here would be sending an unsupported filter. */
+    kv('origin filter', c.dim('not available on a storefront endpoint'));
     local.products.slice(0, 8).forEach((p) => {
       const desc = descriptionText(p);
       console.log(`      ${formatMoney(p.price_range?.min?.amount, p.price_range?.min?.currency).padStart(10)}  ` +
@@ -386,8 +408,11 @@ function parseArgs(argv) {
     const a = argv[i];
     if (!a.startsWith('--')) continue;
     const key = a.slice(2);
-    if (key === 'json') out.json = true;
-    else if (key === 'no-checkout') out['no-checkout'] = true;
+    /* Boolean flags take no value. Anything else consumes the next token, so
+       a flag missing from this test silently swallows the argument after it
+       and then reads as false — which is how --no-origin-filter first looked
+       like it did nothing at all. */
+    if (key === 'json' || key.startsWith('no-')) out[key] = true;
     else out[key] = argv[++i];
   }
   return out;

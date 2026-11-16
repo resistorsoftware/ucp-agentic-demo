@@ -19,12 +19,13 @@ response shown verbatim. No server, no API key, no SDK.
 | [`index.html`](index.html) + [`assets/`](assets) | A UCP agent that runs entirely in the browser. Static files on GitHub Pages. |
 | [`ucp/agent-profile.json`](ucp/agent-profile.json) | **This agent's own published UCP profile.** Merchants fetch it during negotiation — served via jsDelivr, for the reason below. |
 | [`src/ucp-client.js`](src/ucp-client.js) | A dependency-free UCP client, shared unchanged by the browser app and the Node scripts. |
-| [`scripts/demo-cycle.mjs`](scripts/demo-cycle.mjs) | The same cycle in a terminal, for demos and CI. `--no-checkout` stops at the cart. |
+| [`scripts/demo-cycle.mjs`](scripts/demo-cycle.mjs) | The same cycle in a terminal, for demos and CI. `--no-checkout` stops at the cart; `--no-origin-filter` drops `ships_from`. |
 | [`scripts/audit-catalog.mjs`](scripts/audit-catalog.mjs) | Grades a merchant's catalog on agentic readiness, reading only what an agent reads. |
 | [`scripts/fix-catalog.mjs`](scripts/fix-catalog.mjs) | Applies catalog fixes through the Shopify Admin API (needs a token). |
 | [`scripts/saved-catalog.mjs`](scripts/saved-catalog.mjs) | Searches a Dev Dashboard saved catalog scoped to one store. Credentialed, so CLI-only. |
-| [`docs/saved-catalog.md`](docs/saved-catalog.md) | Why that path is credentialed, and why it is blocked for this store. |
+| [`docs/saved-catalog.md`](docs/saved-catalog.md) | Why a saved catalog is *not* a credential, and why that path is blocked for this store. |
 | [`docs/checkout.md`](docs/checkout.md) | The three agent identification tiers, and which call each one unlocks. |
+| [`docs/location.md`](docs/location.md) | How location-aware search really behaves: country-granular, measured against the live catalog. |
 | [`docs/store-readiness.md`](docs/store-readiness.md) | The merchant side: what is live, what is not, and what to change in Shopify admin. |
 | [`docs/catalog-audit.md`](docs/catalog-audit.md) | Current audit output for `hotwire-resistor`. |
 
@@ -35,15 +36,24 @@ response shown verbatim. No server, no API key, no SDK.
    An agent negotiates against this document; it never guesses.
 2. **Search** — `search_catalog`, in two places at once:
    - **Global catalog** (`catalog.shopify.com/api/ucp/mcp`) — cross-merchant discovery.
-     Each result carries its own `seller.domain`.
+     Each result carries its own `seller.domain`. The demo searches as a Montreal
+     buyer and filters to Canadian origin with `ships_from`.
    - **Storefront catalog** (`<merchant>/api/ucp/mcp`) — scoped to this one merchant.
+     It advertises no geographic filter, so this leg sends buyer context alone.
 3. **Selection** — `get_product` for the live option matrix and per-variant state.
 4. **Cart** — `create_cart`. Totals come back as an ordered list the agent must render
    as given. No money moves.
-5. **Handoff** — `continue_url`, where a buyer finishes.
+5. **Checkout** — `create_checkout`. Priced, validated, and still keyless.
+6. **Delivery** — `update_checkout` with a destination, which is what makes the
+   merchant quote real shipping options. The cycle reaches `ready_for_complete`.
+7. **Handoff** — `continue_url`, where a buyer finishes.
 
-The demo deliberately stops at the cart. See
-[“Why it stops at the cart”](#why-it-stops-at-the-cart).
+The demo stops one call short of `complete_checkout`, the only operation here that
+needs a credential. See [“Why it stops where it does”](#why-it-stops-where-it-does).
+
+Location in all of this is coarser than the field names suggest — country-granular,
+with region and postal code accepted but not acted on. Measured in
+[`docs/location.md`](docs/location.md).
 
 ## Run it locally
 
